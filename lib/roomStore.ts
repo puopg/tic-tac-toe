@@ -97,6 +97,13 @@ function placeMark(room: Room, index: number, mark: Player): void {
   }
 }
 
+/** Stamp the room's activity, refresh its status, and return a success result. */
+function touched(room: Room): StoreResult {
+  room.lastActivity = now();
+  recomputeStatus(room);
+  return { ok: true, room };
+}
+
 /** Look up a room by id, returning a not-found error if it is missing. */
 function withRoom(
   id: string,
@@ -189,9 +196,7 @@ export function claimSeat(
     if (holder === playerId) {
       // Idempotent re-claim of a seat you already hold.
       room.seatSeen[seat] = now();
-      room.lastActivity = now();
-      recomputeStatus(room);
-      return { ok: true, room };
+      return touched(room);
     }
     if (holder !== null) {
       return { ok: false, error: "seat-taken" };
@@ -199,9 +204,7 @@ export function claimSeat(
 
     room.seats[seat] = playerId;
     room.seatSeen[seat] = now();
-    room.lastActivity = now();
-    recomputeStatus(room);
-    return { ok: true, room };
+    return touched(room);
   });
 }
 
@@ -213,9 +216,7 @@ export function leaveSeat(id: string, playerId: string): StoreResult {
         room.seatSeen[seat] = null;
       }
     });
-    room.lastActivity = now();
-    recomputeStatus(room);
-    return { ok: true, room };
+    return touched(room);
   });
 }
 
@@ -255,9 +256,7 @@ export function makeMove(
       if (aiMove !== -1) placeMark(room, aiMove, "O");
     }
 
-    room.lastActivity = now();
-    recomputeStatus(room);
-    return { ok: true, room };
+    return touched(room);
   });
 }
 
@@ -269,9 +268,7 @@ export function resetGame(id: string, playerId: string): StoreResult {
     }
     room.board = EMPTY_BOARD.slice();
     room.xIsNext = true;
-    room.lastActivity = now();
-    recomputeStatus(room);
-    return { ok: true, room };
+    return touched(room);
   });
 }
 
