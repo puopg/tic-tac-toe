@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createRoom, fetchRooms, roomErrorCode } from "@/lib/roomClient";
 import { usePolling } from "@/lib/usePolling";
-import type { RoomMode, RoomSummary } from "@/lib/roomTypes";
+import { modeLabel, type RoomMode, type RoomSummary } from "@/lib/roomTypes";
 import MiniBoard from "@/components/MiniBoard/MiniBoard";
 import styles from "./styles.module.scss";
 
@@ -128,7 +128,7 @@ export default function Lobby() {
                       {STATUS_LABEL[room.status]}
                     </span>
                     <span className={styles.modeBadge}>
-                      {room.mode === "ai" ? "vs AI" : "2 Player"}
+                      {modeLabel(room.mode)}
                     </span>
                   </div>
                   <div className={styles.seats}>

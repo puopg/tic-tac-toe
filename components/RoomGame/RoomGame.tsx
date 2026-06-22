@@ -14,7 +14,7 @@ import {
 import { usePlayerId } from "@/lib/usePlayerId";
 import { usePolling } from "@/lib/usePolling";
 import type { Player } from "@/lib/gameLogic";
-import type { RoomView } from "@/lib/roomTypes";
+import { modeLabel, type RoomView } from "@/lib/roomTypes";
 import Board from "@/components/Board/Board";
 import Status, { type StatusTone, playerTone } from "@/components/Status/Status";
 import Scoreboard from "@/components/Scoreboard/Scoreboard";
@@ -214,9 +214,7 @@ export default function RoomGame({ id }: RoomGameProps) {
           ← Lobby
         </Link>
         <h1 className={styles.title}>{room.name}</h1>
-        <span className={styles.modeTag}>
-          {room.mode === "ai" ? "vs AI" : "2 Player"}
-        </span>
+        <span className={styles.modeTag}>{modeLabel(room.mode)}</span>
       </header>
 
       <Status message={statusMessage} tone={statusTone} />
