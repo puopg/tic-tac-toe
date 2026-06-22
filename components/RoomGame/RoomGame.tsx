@@ -15,7 +15,7 @@ import { usePolling } from "@/lib/usePolling";
 import type { Player } from "@/lib/gameLogic";
 import type { RoomView } from "@/lib/roomTypes";
 import Board from "@/components/Board/Board";
-import Status from "@/components/Status/Status";
+import Status, { type StatusTone, playerTone } from "@/components/Status/Status";
 import Scoreboard from "@/components/Scoreboard/Scoreboard";
 import styles from "./styles.module.scss";
 
@@ -187,10 +187,10 @@ export default function RoomGame({ id }: RoomGameProps) {
     room.mode === "ai" ? "AI (O)" : mySeat === "O" ? "You (O)" : "Player O";
 
   let statusMessage: string;
-  let statusTone: "x" | "o" | "draw" | "neutral";
+  let statusTone: StatusTone;
   if (winner) {
     statusMessage = `${winner} wins!`;
-    statusTone = winner === "X" ? "x" : "o";
+    statusTone = playerTone(winner);
   } else if (gameOver) {
     statusMessage = "Draw";
     statusTone = "draw";
@@ -199,10 +199,10 @@ export default function RoomGame({ id }: RoomGameProps) {
     statusTone = "neutral";
   } else if (mySeat) {
     statusMessage = currentTurn === mySeat ? "Your turn" : "Opponent's turn";
-    statusTone = currentTurn === "X" ? "x" : "o";
+    statusTone = playerTone(currentTurn);
   } else {
     statusMessage = `${currentTurn} to move`;
-    statusTone = currentTurn === "X" ? "x" : "o";
+    statusTone = playerTone(currentTurn);
   }
 
   const boardDisabled =
