@@ -9,6 +9,7 @@ import {
   makeMove,
   resetRoom,
   RoomError,
+  roomErrorCode,
 } from "@/lib/roomClient";
 import { usePlayerId } from "@/lib/usePlayerId";
 import { usePolling } from "@/lib/usePolling";
@@ -34,8 +35,7 @@ const ROOM_ERROR_MESSAGES: Record<string, string> = {
 
 /** Map a thrown error to a known room-error message, or the given fallback. */
 function roomErrorMessage(err: unknown, fallback: string): string {
-  const code = err instanceof RoomError ? err.code : "unknown";
-  return ROOM_ERROR_MESSAGES[code] ?? fallback;
+  return ROOM_ERROR_MESSAGES[roomErrorCode(err)] ?? fallback;
 }
 
 export default function RoomGame({ id }: RoomGameProps) {

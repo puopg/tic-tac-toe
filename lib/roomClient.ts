@@ -8,6 +8,11 @@ export class RoomError extends Error {
   }
 }
 
+/** Extract a thrown error's machine-readable code, or "unknown". */
+export function roomErrorCode(err: unknown): string {
+  return err instanceof RoomError ? err.code : "unknown";
+}
+
 async function parseRoom(res: Response): Promise<RoomView> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
