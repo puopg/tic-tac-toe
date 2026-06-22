@@ -1,0 +1,35 @@
+:root {
+  --bg: #0f172a;
+  --bg-elevated: #1e293b;
+  --surface: #273449;
+  --border: #334155;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --accent: #38bdf8;
+  --x-color: #38bdf8;
+  --o-color: #fb7185;
+  --win: #4ade80;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  background: radial-gradient(circle at top, #182338, var(--bg));
+  color: var(--text);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+}
