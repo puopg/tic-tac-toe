@@ -23,6 +23,21 @@ interface RoomGameProps {
   id: string;
 }
 
+/** User-facing copy for the room error codes the UI can surface. */
+const ROOM_ERROR_MESSAGES: Record<string, string> = {
+  "not-your-turn": "It is not your turn.",
+  "cell-taken": "That cell is already taken.",
+  "game-over": "The game is already over.",
+  "seat-taken": "That seat was just taken.",
+  "not-participant": "Only a seated player can do that.",
+};
+
+/** Map a thrown error to a known room-error message, or the given fallback. */
+function roomErrorMessage(err: unknown, fallback: string): string {
+  const code = err instanceof RoomError ? err.code : "unknown";
+  return ROOM_ERROR_MESSAGES[code] ?? fallback;
+}
+
 export default function RoomGame({ id }: RoomGameProps) {
   const playerId = usePlayerId();
   const [paused, setPaused] = useState(false);
@@ -92,16 +107,7 @@ export default function RoomGame({ id }: RoomGameProps) {
         setData(updated);
       } catch (err) {
         setData(snapshot);
-        const code = err instanceof RoomError ? err.code : "unknown";
-        setActionError(
-          code === "not-your-turn"
-            ? "It is not your turn."
-            : code === "cell-taken"
-              ? "That cell is already taken."
-              : code === "game-over"
-                ? "The game is already over."
-                : "Could not make that move.",
-        );
+        setActionError(roomErrorMessage(err, "Could not make that move."));
       } finally {
         setPaused(false);
       }
@@ -116,14 +122,7 @@ export default function RoomGame({ id }: RoomGameProps) {
       try {
         setData(await action());
       } catch (err) {
-        const code = err instanceof RoomError ? err.code : "unknown";
-        setActionError(
-          code === "seat-taken"
-            ? "That seat was just taken."
-            : code === "not-participant"
-              ? "Only a seated player can do that."
-              : fallbackMessage,
-        );
+        setActionError(roomErrorMessage(err, fallbackMessage));
       } finally {
         setPaused(false);
       }
