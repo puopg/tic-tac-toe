@@ -7,7 +7,9 @@ game.
 ## Features
 
 - **Game rooms & lobby:** the landing page lists open rooms with live status and
-  a board preview; create a room as two-player or vs an AI.
+  a board preview; create a room as two-player or vs an AI. The list is paginated
+  (6 rooms per page) with Previous/Next navigation once there is more than one
+  page.
 - **Seat claiming:** visitors claim an open X or O seat, and everyone else
   spectates. Your identity is stored per browser, and only the seat-holder whose
   turn it is can move.
