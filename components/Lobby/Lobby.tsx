@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createRoom,
@@ -39,6 +39,8 @@ function timeAgo(from: number, now: number): string {
   return `${hours}h ago`;
 }
 
+const PAGE_SIZE = 6;
+
 export default function Lobby() {
   const router = useRouter();
   const { data: rooms, error } = usePolling<RoomSummary[]>(
@@ -54,6 +56,20 @@ export default function Lobby() {
   const [mode, setMode] = useState<RoomMode>("two-player");
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+
+  const totalRooms = rooms?.length ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalRooms / PAGE_SIZE));
+  // Polling can shrink the list (rooms get reaped), so clamp the active page.
+  const activePage = Math.min(page, totalPages - 1);
+  const pageRooms = rooms?.slice(
+    activePage * PAGE_SIZE,
+    activePage * PAGE_SIZE + PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    if (page !== activePage) setPage(activePage);
+  }, [page, activePage]);
 
   const handleCreate = useCallback(
     async (event: React.FormEvent) => {
@@ -138,9 +154,9 @@ export default function Lobby() {
         </div>
       )}
 
-      {rooms && rooms.length > 0 && (
+      {rooms && rooms.length > 0 && pageRooms && (
         <ul className={styles.roomList}>
-          {rooms.map((room) => (
+          {pageRooms.map((room) => (
             <li key={room.id}>
               <button
                 type="button"
@@ -173,6 +189,30 @@ export default function Lobby() {
             </li>
           ))}
         </ul>
+      )}
+
+      {totalPages > 1 && (
+        <nav className={styles.pagination} aria-label="Rooms pages">
+          <button
+            type="button"
+            className={styles.pageButton}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={activePage === 0}
+          >
+            Previous
+          </button>
+          <span className={styles.pageStatus} aria-live="polite">
+            Page {activePage + 1} of {totalPages}
+          </span>
+          <button
+            type="button"
+            className={styles.pageButton}
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={activePage === totalPages - 1}
+          >
+            Next
+          </button>
+        </nav>
       )}
 
       {completed && completed.length > 0 && (
