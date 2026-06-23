@@ -55,7 +55,7 @@ app/api/completed/        # REST endpoints: list completed games + fetch one for
 components/<Name>/         # One folder per component, each with styles.module.scss
 lib/gameLogic.ts          # Pure game logic: winner detection + minimax AI
 lib/roomStore.ts          # In-memory server store (Map on globalThis); all validation
-lib/roomTypes.ts          # Shared room, seat, and score types
+lib/roomTypes.ts          # Shared room, seat, score, and completed-game types
 lib/roomClient.ts         # Browser fetch helpers for the room API
 lib/apiHelpers.ts         # Shared request/response helpers for the room API routes
 lib/usePolling.ts         # Client hook: poll the server on an interval
