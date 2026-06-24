@@ -74,6 +74,7 @@ lib/roomStore.ts          # In-memory server store (Map on globalThis); all vali
 lib/roomTypes.ts          # Shared room, seat, score, and completed-game types
 lib/usePolling.ts         # Client hook: poll the server on an interval
 lib/usePlayerId.ts        # Client hook: stable per-browser player id
+constants/game.ts         # Cross-cutting domain constants (board size, AI seat sentinel)
 ```
 
 See [AGENTS.md](./AGENTS.md) for contribution conventions (notably the styling

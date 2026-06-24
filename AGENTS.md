@@ -104,6 +104,15 @@ its own `styles.module.scss`. Do not share one stylesheet across components.
   in-memory room and completed-game store plus all move/seat validation in
   `lib/roomStore.ts`, shared types in `lib/roomTypes.ts`, and the client hooks
   `usePolling`/`usePlayerId`.
+- `constants/` holds cross-cutting domain constants shared across more than one
+  module - e.g. `INITIAL_SIZE` (the board side length, used by `utils/gameLogic`,
+  the board components, and the store) and `AI_SEAT` (the AI seat sentinel used
+  by the store), both in `constants/game.ts`. Keep module-internal tuning
+  (minimax weights, store TTLs) and component-local UI timings
+  (`AI_MOVE_DELAY_MS`, `AUTOPLAY_MS`, `PAGE_SIZE`) colocated with their owners
+  rather than centralizing them here. A constant that is inseparable from a
+  colocated type (e.g. `DIRECTIONS`, typed `readonly Direction[]`) stays with
+  that type.
 - Routes, pages, and API endpoints live in `app/` (App Router); the room REST
   endpoints are under `app/api/rooms/` and the read-only completed-game endpoints
   under `app/api/completed/`. The replay view lives at `app/replay/[id]/`.

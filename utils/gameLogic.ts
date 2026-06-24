@@ -1,3 +1,5 @@
+import { INITIAL_SIZE } from "@/constants/game";
+
 export type Player = "X" | "O";
 export type Cell = Player | null;
 export type Board = Cell[];
@@ -10,9 +12,6 @@ export const DIRECTIONS: readonly Direction[] = [
   "left",
   "right",
 ];
-
-/** The board is a fixed square of this side length. */
-export const INITIAL_SIZE = 3;
 
 /**
  * One turn's action. Players alternate strictly - X takes the even-indexed

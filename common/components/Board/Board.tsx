@@ -1,4 +1,5 @@
-import { INITIAL_SIZE, type Board as BoardState } from "@/utils/gameLogic";
+import { INITIAL_SIZE } from "@/constants/game";
+import { type Board as BoardState } from "@/utils/gameLogic";
 import Square from "@/common/components/Square/Square";
 import styles from "./styles.module.scss";
 
