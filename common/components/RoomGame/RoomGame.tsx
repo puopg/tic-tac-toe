@@ -16,9 +16,9 @@ import { usePlayerId } from "@/lib/usePlayerId";
 import { usePolling } from "@/lib/usePolling";
 import type { Direction, Player } from "@/lib/gameLogic";
 import { modeLabel, type RoomView } from "@/lib/roomTypes";
-import Board from "@/components/Board/Board";
-import Status, { type StatusTone, playerTone } from "@/components/Status/Status";
-import Scoreboard from "@/components/Scoreboard/Scoreboard";
+import Board from "@/common/components/Board/Board";
+import Status, { type StatusTone, playerTone } from "@/common/components/Status/Status";
+import Scoreboard from "@/common/components/Scoreboard/Scoreboard";
 import styles from "./styles.module.scss";
 
 interface RoomGameProps {

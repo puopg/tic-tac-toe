@@ -15,7 +15,7 @@ import {
   type RoomMode,
   type RoomSummary,
 } from "@/lib/roomTypes";
-import MiniBoard from "@/components/MiniBoard/MiniBoard";
+import MiniBoard from "@/common/components/MiniBoard/MiniBoard";
 import styles from "./styles.module.scss";
 
 const STATUS_LABEL: Record<RoomSummary["status"], string> = {

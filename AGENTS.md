@@ -46,17 +46,18 @@ of truth, and anything that changes how actions are recorded must keep
   [CSS Modules](https://nextjs.org/docs/app/building-your-application/styling/css-modules)
   authored in SCSS.
 - **Every component owns its styles.** Each component lives in its own folder
-  under `components/` and is paired with a `styles.module.scss` file in that same
-  folder. For example:
+  under `common/components/` and is paired with a `styles.module.scss` file in
+  that same folder. For example:
 
   ```
-  components/
-    Board/
-      Board.tsx
-      styles.module.scss
-    Square/
-      Square.tsx
-      styles.module.scss
+  common/
+    components/
+      Board/
+        Board.tsx
+        styles.module.scss
+      Square/
+        Square.tsx
+        styles.module.scss
   ```
 
 - Import styles as `import styles from "./styles.module.scss"` and reference
@@ -74,7 +75,8 @@ its own `styles.module.scss`. Do not share one stylesheet across components.
 
 ## Layout conventions
 
-- Reusable components live in `components/<Name>/`.
+- Reusable components live in `common/components/<Name>/` so they can be shared
+  across the app.
 - `lib/` holds non-component code: pure game logic (no React) in
   `lib/gameLogic.ts`, the in-memory room and completed-game store plus all
   move/seat validation in `lib/roomStore.ts`, shared types in `lib/roomTypes.ts`,

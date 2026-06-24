@@ -1,4 +1,4 @@
-import Lobby from "@/components/Lobby/Lobby";
+import Lobby from "@/common/components/Lobby/Lobby";
 import styles from "./page.module.scss";
 
 export default function Home() {

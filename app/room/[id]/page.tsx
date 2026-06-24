@@ -1,4 +1,4 @@
-import RoomGame from "@/components/RoomGame/RoomGame";
+import RoomGame from "@/common/components/RoomGame/RoomGame";
 import styles from "@/app/page.module.scss";
 
 export default async function RoomPage({

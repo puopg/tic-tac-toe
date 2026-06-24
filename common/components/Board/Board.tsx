@@ -1,5 +1,5 @@
 import { INITIAL_SIZE, type Board as BoardState } from "@/lib/gameLogic";
-import Square from "@/components/Square/Square";
+import Square from "@/common/components/Square/Square";
 import styles from "./styles.module.scss";
 
 interface BoardProps {
