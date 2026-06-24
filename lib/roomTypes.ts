@@ -19,14 +19,10 @@ export interface Room {
   id: string;
   name: string;
   board: Board;
-  /** Board dimensions; fixed at 3×3 (the shift action never resizes the grid). */
-  rows: number;
-  cols: number;
   /** Every action this round, in turn order; X takes even indices, O odd. */
   actions: GameAction[];
   xIsNext: boolean;
   scores: Scores;
-  status: RoomStatus;
   seats: Seats;
   mode: RoomMode;
   /** Whether O has spent its one-time whole-grid shift this round. */
@@ -38,6 +34,8 @@ export interface Room {
 }
 
 export interface RoomView extends Room {
+  /** Derived at serialization time from the board, never stored. */
+  status: RoomStatus;
   /** Derived at serialization time via calculateWinner, never stored. */
   winningLine: [number, number, number] | null;
 }
@@ -46,8 +44,6 @@ export interface RoomSummary {
   id: string;
   name: string;
   board: Board;
-  rows: number;
-  cols: number;
   status: RoomStatus;
   mode: RoomMode;
   seatsTaken: { X: boolean; O: boolean };
@@ -78,9 +74,6 @@ export interface CompletedGameSummary {
   mode: RoomMode;
   /** Final board, for a preview. */
   board: Board;
-  /** Final board dimensions, for rendering the preview grid. */
-  rows: number;
-  cols: number;
   /** Winning player, or null for a draw. */
   winner: Player | null;
   completedAt: number;
