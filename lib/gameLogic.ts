@@ -172,42 +172,11 @@ export function boardAfterActions(
   return { board, rows, cols };
 }
 
-function countEmpty(board: Board): number {
-  let n = 0;
-  for (const cell of board) if (cell === null) n++;
-  return n;
-}
-
-// Full, exact minimax stays affordable up to a 3×3 board; beyond that the
-// search is depth-limited and falls back to a heuristic at the cutoff.
-const FULL_SEARCH_MAX_EMPTY = INITIAL_SIZE * INITIAL_SIZE;
-const DEPTH_LIMIT = 6;
-/** Terminal scores dwarf any heuristic value so a real win is always chosen. */
+/** Terminal scores dwarf depth so a real win is always chosen. */
 const WIN_SCORE = 1_000_000;
 
-/** Static evaluation from `aiPlayer`'s perspective for depth-limited search. */
-function heuristic(
-  board: Board,
-  rows: number,
-  cols: number,
-  aiPlayer: Player,
-): number {
-  const opp = otherPlayer(aiPlayer);
-  let score = 0;
-  for (const [a, b, c] of winningLines(rows, cols)) {
-    let ai = 0;
-    let op = 0;
-    for (const i of [a, b, c]) {
-      if (board[i] === aiPlayer) ai++;
-      else if (board[i] === opp) op++;
-    }
-    if (ai > 0 && op > 0) continue; // contested line, no value to either side
-    if (ai > 0) score += ai === 2 ? 50 : 1;
-    else if (op > 0) score -= op === 2 ? 50 : 1;
-  }
-  return score;
-}
-
+// The board is always 3×3, so a full, exact minimax is always affordable - no
+// depth limit or heuristic cutoff is needed.
 function minimax(
   board: Board,
   rows: number,
@@ -215,7 +184,6 @@ function minimax(
   current: Player,
   aiPlayer: Player,
   depth: number,
-  maxDepth: number,
   alpha: number,
   beta: number,
 ): number {
@@ -224,7 +192,6 @@ function minimax(
     return result.winner === aiPlayer ? WIN_SCORE - depth : depth - WIN_SCORE;
   }
   if (isBoardFull(board)) return 0;
-  if (depth >= maxDepth) return heuristic(board, rows, cols, aiPlayer);
 
   const isMaximizing = current === aiPlayer;
   let best = isMaximizing ? -Infinity : Infinity;
@@ -238,7 +205,6 @@ function minimax(
       otherPlayer(current),
       aiPlayer,
       depth + 1,
-      maxDepth,
       alpha,
       beta,
     );
@@ -255,10 +221,6 @@ function minimax(
   return best;
 }
 
-function depthFor(board: Board): number {
-  return countEmpty(board) <= FULL_SEARCH_MAX_EMPTY ? Infinity : DEPTH_LIMIT;
-}
-
 /**
  * Best placement for `aiPlayer` together with its minimax score (the value of
  * the resulting position with the opponent to move, from `aiPlayer`'s view).
@@ -271,7 +233,6 @@ function bestPlacement(
   aiPlayer: Player,
 ): { index: number; score: number } {
   const work = board.slice();
-  const maxDepth = depthFor(work);
   let bestScore = -Infinity;
   let bestMove = -1;
   for (let i = 0; i < work.length; i++) {
@@ -284,7 +245,6 @@ function bestPlacement(
       otherPlayer(aiPlayer),
       aiPlayer,
       1,
-      maxDepth,
       -Infinity,
       Infinity,
     );
@@ -336,7 +296,7 @@ export function chooseAiAction(
   // The best placement's value is already known from bestPlacement, so only
   // the shift candidates need a fresh lookahead.
   const value = (b: Board) =>
-    minimax(b, rows, cols, "X", me, 1, depthFor(b), -Infinity, Infinity);
+    minimax(b, rows, cols, "X", me, 1, -Infinity, Infinity);
 
   let best: GameAction = { kind: "place", index: placeIndex };
   let bestScore = placeScore;
