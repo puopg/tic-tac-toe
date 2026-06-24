@@ -9,7 +9,7 @@ interface MiniBoardProps {
 const MiniBoard = ({ board }: MiniBoardProps) => {
   return (
     <div
-      className={styles.mini}
+      className={styles.root}
       aria-hidden="true"
       style={{
         gridTemplateColumns: `repeat(${INITIAL_SIZE}, 1fr)`,

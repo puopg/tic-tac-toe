@@ -17,7 +17,7 @@ const Board = ({
 }: BoardProps) => {
   return (
     <div
-      className={styles.board}
+      className={styles.root}
       role="grid"
       aria-label="Tic-tac-toe board"
       style={{ gridTemplateColumns: `repeat(${INITIAL_SIZE}, 1fr)` }}

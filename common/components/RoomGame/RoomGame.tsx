@@ -240,7 +240,7 @@ const RoomGame = ({ id }: RoomGameProps) => {
     gameOver || mySeat === null || currentTurn !== mySeat || paused;
 
   return (
-    <div className={styles.room}>
+    <div className={styles.root}>
       <header className={styles.topBar}>
         <Link href="/" className={styles.back}>
           ← Lobby

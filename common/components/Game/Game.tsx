@@ -115,7 +115,7 @@ const Game = () => {
   }
 
   return (
-    <div className={styles.game}>
+    <div className={styles.root}>
       <header className={styles.topBar}>
         <h1 className={styles.title}>Tic-Tac-Toe</h1>
         <OverflowMenu

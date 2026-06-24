@@ -14,7 +14,7 @@ interface ScoreboardProps {
 
 const Scoreboard = ({ scores, xLabel, oLabel }: ScoreboardProps) => {
   return (
-    <div className={styles.scoreboard}>
+    <div className={styles.root}>
       <div className={`${styles.item} ${styles.x}`}>
         <span className={styles.label}>{xLabel}</span>
         <span className={styles.value}>{scores.X}</span>

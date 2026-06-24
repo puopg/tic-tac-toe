@@ -115,7 +115,7 @@ const Replay = ({ id }: ReplayProps) => {
   };
 
   return (
-    <div className={styles.replay}>
+    <div className={styles.root}>
       <header className={styles.topBar}>
         <Link href="/" className={styles.back}>
           ← Lobby

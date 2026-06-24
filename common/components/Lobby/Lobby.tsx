@@ -99,7 +99,7 @@ const Lobby = () => {
   );
 
   return (
-    <div className={styles.lobby}>
+    <div className={styles.root}>
       <header className={styles.header}>
         <h1 className={styles.title}>Tic-Tac-Toe</h1>
         <p className={styles.subtitle}>

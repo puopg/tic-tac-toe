@@ -61,7 +61,15 @@ of truth, and anything that changes how actions are recorded must keep
   ```
 
 - Import styles as `import styles from "./styles.module.scss"` and reference
-  classes via the `styles` object (e.g. `className={styles.board}`).
+  classes via the `styles` object (e.g. `className={styles.root}`).
+- **The component's root element uses `styles.root` as its main class.** When a
+  component renders a `<div>` (or other element) as its outermost node, that
+  first element's primary class is `styles.root` rather than a component-specific
+  name like `styles.board`. Components whose root is not a `<div>` (e.g. `Square`,
+  which renders a `<button>`) are exempt and keep their semantic root class.
+  Alternate full-screen states reached via early returns (e.g. loading/not-found
+  branches) keep their own semantic class; only the primary render's root uses
+  `styles.root`.
 - Compose multiple/conditional classes by joining them, e.g.
   `[styles.square, isWinning ? styles.winning : ""].filter(Boolean).join(" ")`.
 - **Only global styles** (CSS variables, resets, `body` defaults) live in

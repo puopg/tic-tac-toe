@@ -48,7 +48,7 @@ const OverflowMenu = ({
   }, [open]);
 
   return (
-    <div className={styles.container} ref={containerRef}>
+    <div className={styles.root} ref={containerRef}>
       <button
         type="button"
         className={styles.trigger}
