@@ -46,19 +46,22 @@ of truth, and anything that changes how actions are recorded must keep
   [CSS Modules](https://nextjs.org/docs/app/building-your-application/styling/css-modules)
   authored in SCSS.
 - **Every component owns its styles.** Each component lives in its own folder
-  under `common/components/` and is paired with a `styles.module.scss` file in
-  that same folder. For example:
+  under `common/components/`, with its entry file named `index.tsx` and paired
+  with a `styles.module.scss` file in that same folder. For example:
 
   ```
   common/
     components/
       Board/
-        Board.tsx
+        index.tsx
         styles.module.scss
       Square/
-        Square.tsx
+        index.tsx
         styles.module.scss
   ```
+
+  The folder name is the component name, and imports reference the folder (which
+  resolves to `index.tsx`), e.g. `import Board from "@/common/components/Board"`.
 
 - Import styles as `import styles from "./styles.module.scss"` and reference
   classes via the `styles` object (e.g. `className={styles.root}`).
@@ -85,8 +88,9 @@ of truth, and anything that changes how actions are recorded must keep
   `app/globals.scss` (e.g. `var(--x-color)`); use them instead of hard-coding
   repeated values.
 
-When adding a new component, create a new folder with both the `.tsx` file and
-its own `styles.module.scss`. Do not share one stylesheet across components.
+When adding a new component, create a new folder with both the `index.tsx` entry
+file and its own `styles.module.scss`. Do not share one stylesheet across
+components.
 
 ## Component conventions
 

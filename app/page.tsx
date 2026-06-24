@@ -1,4 +1,4 @@
-import Lobby from "@/common/components/Lobby/Lobby";
+import Lobby from "@/common/components/Lobby";
 import styles from "./page.module.scss";
 
 const Home = () => {

@@ -2,8 +2,8 @@
 
 import classNames from "classnames";
 import { useEffect, useId, useRef, useState } from "react";
-import type { GameMode } from "@/common/components/Game/Game";
-import Scoreboard, { type Scores } from "@/common/components/Scoreboard/Scoreboard";
+import type { GameMode } from "@/common/components/Game";
+import Scoreboard, { type Scores } from "@/common/components/Scoreboard";
 import styles from "./styles.module.scss";
 
 interface OverflowMenuProps {

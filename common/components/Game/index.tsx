@@ -7,10 +7,10 @@ import {
   isBoardFull,
   type Board as BoardState,
 } from "@/utils/gameLogic";
-import Board from "@/common/components/Board/Board";
-import { type Scores } from "@/common/components/Scoreboard/Scoreboard";
-import OverflowMenu from "@/common/components/OverflowMenu/OverflowMenu";
-import Status, { type StatusTone, playerTone } from "@/common/components/Status/Status";
+import Board from "@/common/components/Board";
+import { type Scores } from "@/common/components/Scoreboard";
+import OverflowMenu from "@/common/components/OverflowMenu";
+import Status, { type StatusTone, playerTone } from "@/common/components/Status";
 import styles from "./styles.module.scss";
 
 export type GameMode = "two-player" | "ai";
