@@ -9,8 +9,8 @@ import {
   type Player,
 } from "@/utils/gameLogic";
 import { modeLabel, type CompletedGameView } from "@/lib/roomTypes";
-import Board from "@/common/components/Board/Board";
-import Status, { type StatusTone, playerTone } from "@/common/components/Status/Status";
+import Board from "@/common/components/Board";
+import Status, { type StatusTone, playerTone } from "@/common/components/Status";
 import styles from "./styles.module.scss";
 
 interface ReplayProps {

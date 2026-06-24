@@ -1,4 +1,4 @@
-import Replay from "@/common/components/Replay/Replay";
+import Replay from "@/common/components/Replay";
 import styles from "@/app/page.module.scss";
 
 const ReplayPage = async ({
