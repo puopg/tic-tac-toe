@@ -76,7 +76,7 @@ export interface CompletedGameSummary {
   id: string;
   name: string;
   mode: RoomMode;
-  /** Final board (post-extensions), for a preview. */
+  /** Final board, for a preview. */
   board: Board;
   /** Final board dimensions, for rendering the preview grid. */
   rows: number;
