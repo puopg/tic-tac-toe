@@ -122,3 +122,16 @@ its own `styles.module.scss`. Do not share one stylesheet across components.
 - `npm run dev` - start the dev server
 - `npm run build` - production build
 - `npm run lint` - run ESLint
+- `npm test` - run the Vitest unit suite once (`vitest run`)
+
+## Testing
+
+Unit tests use [Vitest](https://vitest.dev/) and run in the `node` environment
+(see `vitest.config.ts`, which mirrors the `@/*` path alias). Tests are
+co-located next to the code as `*.test.ts` (e.g. `utils/gameLogic.test.ts`,
+`lib/roomStore.test.ts`) and cover the pure game-state logic and the store's
+turn/seat/shift validation. They are deterministic - no timers, network, or
+randomness - so prefer testing exported pure functions directly; the in-memory
+store can be driven straight through its exported functions (`createRoom`,
+`claimSeat`, `makeMove`, `shiftBoardAction`) without a live server. Network,
+polling, and React rendering are intentionally out of scope here.
