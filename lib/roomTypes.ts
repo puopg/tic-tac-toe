@@ -1,4 +1,4 @@
-import type { Board, GameAction, Player } from "@/lib/gameLogic";
+import type { Board, GameAction, Player } from "@/utils/gameLogic";
 
 export type RoomMode = "two-player" | "ai";
 export type RoomStatus = "waiting" | "in-progress" | "finished";
@@ -88,9 +88,6 @@ export interface CompletedGameView {
   actions: GameAction[];
   completedAt: number;
 }
-
-/** Sentinel playerId for the AI seat; no human can ever match it. */
-export const AI_SEAT = "__AI__";
 
 /** Short human-readable label for a room's mode. */
 export function modeLabel(mode: RoomMode): string {

@@ -8,7 +8,7 @@ A multiplayer tic-tac-toe app built with Next.js (App Router) and TypeScript.
 Players join game rooms from a lobby and play across browsers or spectate live.
 Rooms are kept in an in-memory server store (`lib/roomStore.ts`, a `Map` on
 `globalThis`) and surfaced to clients via polling. A room is either two-player or
-played against an AI (minimax, in `lib/gameLogic.ts`).
+played against an AI (minimax, in `utils/gameLogic.ts`).
 
 The board is a fixed 3x3, but the game is not plain tic-tac-toe: player O has one
 once-per-game "shift" action that slides the whole grid one cell
@@ -46,21 +46,30 @@ of truth, and anything that changes how actions are recorded must keep
   [CSS Modules](https://nextjs.org/docs/app/building-your-application/styling/css-modules)
   authored in SCSS.
 - **Every component owns its styles.** Each component lives in its own folder
-  under `components/` and is paired with a `styles.module.scss` file in that same
-  folder. For example:
+  under `common/components/` and is paired with a `styles.module.scss` file in
+  that same folder. For example:
 
   ```
-  components/
-    Board/
-      Board.tsx
-      styles.module.scss
-    Square/
-      Square.tsx
-      styles.module.scss
+  common/
+    components/
+      Board/
+        Board.tsx
+        styles.module.scss
+      Square/
+        Square.tsx
+        styles.module.scss
   ```
 
 - Import styles as `import styles from "./styles.module.scss"` and reference
-  classes via the `styles` object (e.g. `className={styles.board}`).
+  classes via the `styles` object (e.g. `className={styles.root}`).
+- **The component's root element uses `styles.root` as its main class.** When a
+  component renders a `<div>` (or other element) as its outermost node, that
+  first element's primary class is `styles.root` rather than a component-specific
+  name like `styles.board`. Components whose root is not a `<div>` (e.g. `Square`,
+  which renders a `<button>`) are exempt and keep their semantic root class.
+  Alternate full-screen states reached via early returns (e.g. loading/not-found
+  branches) keep their own semantic class; only the primary render's root uses
+  `styles.root`.
 - Compose multiple/conditional classes by joining them, e.g.
   `[styles.square, isWinning ? styles.winning : ""].filter(Boolean).join(" ")`.
 - **Only global styles** (CSS variables, resets, `body` defaults) live in
@@ -72,15 +81,38 @@ of truth, and anything that changes how actions are recorded must keep
 When adding a new component, create a new folder with both the `.tsx` file and
 its own `styles.module.scss`. Do not share one stylesheet across components.
 
+## Component conventions
+
+- **Declare components as arrow-function consts**, not function declarations.
+  Use `const Name = (props: Props) => { ... }` followed by a separate
+  `export default Name;` at the bottom of the file, rather than
+  `export default function Name(...) { ... }`. This applies to shared components
+  in `common/components/` as well as the App Router `page.tsx`/`layout.tsx`
+  entry points.
+
 ## Layout conventions
 
-- Reusable components live in `components/<Name>/`.
-- `lib/` holds non-component code: pure game logic (no React) in
-  `lib/gameLogic.ts`, the in-memory room and completed-game store plus all
-  move/seat validation in `lib/roomStore.ts`, shared types in `lib/roomTypes.ts`,
-  browser fetch helpers in `lib/roomClient.ts`, shared request/response helpers
-  for the API routes in `lib/apiHelpers.ts`, and the client hooks
+- Reusable components live in `common/components/<Name>/` so they can be shared
+  across the app.
+- `utils/` holds stateless helper modules that can be shared anywhere: pure game
+  logic (no React) in `utils/gameLogic.ts`, browser fetch helpers in
+  `utils/roomClient.ts`, and shared request/response helpers for the API routes
+  in `utils/apiHelpers.ts`. Keep a helper's types colocated with it (e.g. the
+  `Board`/`Direction`/`GameAction` types live alongside the functions in
+  `utils/gameLogic.ts`).
+- `lib/` holds the remaining non-component code that is not a pure helper: the
+  in-memory room and completed-game store plus all move/seat validation in
+  `lib/roomStore.ts`, shared types in `lib/roomTypes.ts`, and the client hooks
   `usePolling`/`usePlayerId`.
+- `constants/` holds cross-cutting domain constants shared across more than one
+  module - e.g. `INITIAL_SIZE` (the board side length, used by `utils/gameLogic`,
+  the board components, and the store) and `AI_SEAT` (the AI seat sentinel used
+  by the store), both in `constants/game.ts`. Keep module-internal tuning
+  (minimax weights, store TTLs) and component-local UI timings
+  (`AI_MOVE_DELAY_MS`, `AUTOPLAY_MS`, `PAGE_SIZE`) colocated with their owners
+  rather than centralizing them here. A constant that is inseparable from a
+  colocated type (e.g. `DIRECTIONS`, typed `readonly Direction[]`) stays with
+  that type.
 - Routes, pages, and API endpoints live in `app/` (App Router); the room REST
   endpoints are under `app/api/rooms/` and the read-only completed-game endpoints
   under `app/api/completed/`. The replay view lives at `app/replay/[id]/`.

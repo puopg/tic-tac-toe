@@ -1,16 +1,15 @@
+import { AI_SEAT, INITIAL_SIZE } from "@/constants/game";
 import {
   boardAfterActions,
   calculateWinner,
   chooseAiAction,
-  INITIAL_SIZE,
   isGameOver,
   shiftBoard,
   type Board,
   type Direction,
   type Player,
-} from "@/lib/gameLogic";
+} from "@/utils/gameLogic";
 import {
-  AI_SEAT,
   type CompletedGame,
   type CompletedGameSummary,
   type CompletedGameView,
