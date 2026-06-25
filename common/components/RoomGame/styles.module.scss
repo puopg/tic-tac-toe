@@ -90,6 +90,17 @@
   }
 }
 
+// Outer layout: the faded history column on the left, then the board area
+// (X panel / board / O panel) filling the rest. The history is the outermost
+// column so the player panels still flank the board directly.
+.playArea {
+  display: grid;
+  grid-template-columns: minmax(0, 150px) minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  width: 100%;
+}
+
 .boardArea {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 300px) minmax(0, 1fr);
@@ -212,6 +223,14 @@
   font-weight: 600;
   color: var(--text-muted);
   text-align: center;
+}
+
+// Below this the side-by-side history + board gets cramped, so stack the
+// history above the board instead of letting it squeeze the play area.
+@media (max-width: 900px) {
+  .playArea {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
