@@ -248,6 +248,8 @@ components.
 - `npm test` - run the Vitest unit suite once (`vitest run`)
 - `npm run select-tickets` - run the agent-loop ticket selector CLI (reads a
   `gh issue list` JSON payload on stdin, prints the chosen issue numbers)
+- `npm run set-project-status` - run the best-effort Projects v2 board-sync CLI
+  (`--issue N --status "In Progress"`; non-fatal, no-ops without `PROJECTS_TOKEN`)
 
 ## Testing
 
