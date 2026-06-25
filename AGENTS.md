@@ -32,19 +32,23 @@ When a game is won, the `Board` draws a green connecting line over the three
 winning cells via the `WinningLine` component (`common/components/WinningLine/`),
 an absolutely-positioned SVG overlay rendered as the board's last child (the
 board root is `position: relative`). Endpoints come from the pure
-`winningLineCoords(line)` helper, which maps the first and last cell indices of
-the winning triple to exact-thirds percentages (`(col + 0.5) / size`,
-`(row + 0.5) / size`); since `calculateWinner` returns each triple ordered along
-its line, those two ends are correct for all eight wins. These percentages are
-deliberately gap-agnostic: with the board's `gap: 10px`, corner-cell endpoints
-land ~3px (`gap / 3`) short of the true cell centers, an accepted approximation
-kept well within the round-capped stroke in exchange for resize-safety (the
-endpoints stay correct at any board size since they are pure percentages). The overlay is sized to
-the grid's cell area (`top/left: 14px; width/height: calc(100% - 28px)`, matching
-the board padding) with explicit dimensions - a bare `<svg>` keeps its intrinsic
-300x150 size under `inset` alone, which would skew the percentages - and is
-`pointer-events: none` so it never blocks clicks. The same overlay appears in
-replay automatically because `/replay/[id]` renders the same `Board` with
+`winningLineCoords(line)` helper. It starts from the exact-thirds cell centers of
+the first and last cells (`(col + 0.5) / size`, `(row + 0.5) / size`; since
+`calculateWinner` returns each triple ordered along its line, those two ends are
+correct for all eight wins), then extends each endpoint outward past its center,
+along the line, toward that end cell's outer edge - controlled by
+`ENDPOINT_EXTEND` (fraction of the half-cell from center to outer edge; `0.8`
+reaches most of the way without touching the board boundary) - so the line runs
+well into both end cells rather than stopping at their centers. All of this is
+expressed in percentages, so it stays correct at any board size. The percentages
+are deliberately gap-agnostic: with the board's `gap: 10px` the underlying cell
+centers sit ~3px (`gap / 3`) off true center, an accepted approximation kept well
+within the round-capped stroke in exchange for resize-safety. The overlay is
+sized to the grid's cell area (`top/left: 14px; width/height: calc(100% - 28px)`,
+matching the board padding) with explicit dimensions - a bare `<svg>` keeps its
+intrinsic 300x150 size under `inset` alone, which would skew the percentages -
+and is `pointer-events: none` so it never blocks clicks. The same overlay appears
+in replay automatically because `/replay/[id]` renders the same `Board` with
 `winningLine`.
 
 Each room records its history as a single ordered `actions` log, where each
