@@ -74,6 +74,30 @@ curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/i
 
 which auto-detects the runner's platform build and puts `no-mistakes` on `PATH` - so there is no installer variable to configure.
 
+## Board sync (optional)
+
+The agent loop drives issue **labels** (`claude:in-progress`, `claude:needs-captain`).
+On a GitHub Projects v2 board, the *column* a card sits in is driven by the project's single-select **Status** field, not by labels - so without an extra step the card would not move as the agent works.
+Board sync is the optional step that keeps the card's Status in step with the lifecycle.
+
+It is entirely best-effort: if it is not configured, the loop runs exactly as before and nothing fails.
+
+To enable it:
+
+1. **Secret.** Add a `PROJECTS_TOKEN` repository secret: a fine-grained personal access token with **Projects** read+write permission (the default `GITHUB_TOKEN` cannot write user/org Projects v2, which is why a separate PAT is needed - this uses a PAT, not OIDC).
+2. **Status options.** On the project, the **Status** field must offer options named `In Progress`, `In Review`, and `Needs captain` (matched case-insensitively).
+   `Done` is **not** required here: the merge -> `Done` transition is handled natively by GitHub Projects' built-in "pull request merged / item closed -> Done" workflow, and tickets close via `Closes #<n>` in the PR body.
+
+Once set up, the workflows move the card automatically:
+
+- **Claimed** -> `In Progress` (dispatch, right after `claude:in-progress` is added).
+- **PR opened** -> `In Review` (dispatch, when an open PR exists for the branch; and respond, after the agent pushes an update for requested changes).
+- **Parked** -> `Needs captain` (dispatch, alongside the `claude:needs-captain` label when no PR was opened).
+
+The mechanics live in the pure `setProjectStatus(...)` helper (`scripts/agent-loop/setProjectStatus.ts`, covered by `setProjectStatus.test.ts`), called by the thin CLI `setProjectStatus.cli.ts` (also `npm run set-project-status`).
+Both the CLI and the helper are non-fatal by design - a missing `PROJECTS_TOKEN`, an issue on no project, a missing `Status` field or option, or any API error logs a clear message and exits `0`.
+The workflow steps additionally carry `continue-on-error: true`, so board sync can never block or fail the loop.
+
 ## Rollout
 
 The loop is built so you can prove it before trusting the schedule:

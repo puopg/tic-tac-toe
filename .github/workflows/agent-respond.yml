@@ -111,3 +111,24 @@ jobs:
             3. Leave a brief PR comment summarising what you changed in response.
             Never merge. The captain merges.
           claude_args: "--allowedTools Bash,Edit,Write,Read,Glob,Grep"
+
+      # Best-effort board sync: the agent has just pushed an update in response
+      # to feedback, so move the ticket's Projects v2 card back to "In Review".
+      # The issue number is the branch suffix (fm/issue-<number>). Guarded twice
+      # (continue-on-error plus the script's non-fatal behavior) so it can never
+      # fail the responder job.
+      - name: Set board status to In Review
+        if: steps.pr.outputs.go == 'true'
+        continue-on-error: true
+        env:
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          BRANCH: ${{ steps.pr.outputs.branch }}
+        run: |
+          set -u
+          issue="${BRANCH#fm/issue-}"
+          if printf '%s' "$issue" | grep -qE '^[0-9]+$'; then
+            echo "Setting board status to In Review for issue #$issue"
+            npm run --silent set-project-status -- --issue "$issue" --status "In Review"
+          else
+            echo "Branch $BRANCH has no issue number suffix; skipping board sync."
+          fi

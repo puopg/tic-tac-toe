@@ -301,3 +301,16 @@ Conventions worth preserving when touching this code:
   no-mistakes CLI" step (the hardcoded `docs/install.sh` curl one-liner); the only
   one-time setup is the `ANTHROPIC_API_KEY` secret and running
   `scripts/agent-loop/setup-labels.sh` (idempotent, plain `gh`) to create labels.
+- **Board sync is best-effort and label-independent.** Projects v2 columns are
+  driven by the project's single-select `Status` field, not by labels, so the
+  workflows also call the pure `setProjectStatus(...)` helper
+  (`scripts/agent-loop/setProjectStatus.ts`, tested by `setProjectStatus.test.ts`,
+  CLI `setProjectStatus.cli.ts` / `npm run set-project-status`) to move the card:
+  `In Progress` after claim, `In Review` when a PR is open (dispatch and respond),
+  `Needs captain` on the park path. It authenticates with a separate
+  `PROJECTS_TOKEN` PAT (the default `GITHUB_TOKEN` cannot write user/org Projects
+  v2) and matches the `Status` option name case-insensitively. The helper, its CLI,
+  and the workflow steps (`continue-on-error: true`) are all non-fatal: a missing
+  token, no project, a missing option, or any API error logs and no-ops, never
+  failing the loop. `Done` is intentionally not driven here - GitHub Projects'
+  native "PR merged / item closed -> Done" workflow handles it via `Closes #<n>`.
