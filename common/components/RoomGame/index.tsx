@@ -381,7 +381,7 @@ const RoomGame = (props: Props) => {
           line and never wins on its own.
         </p>
         <p className={styles.shiftHelpParagraph}>
-          It exists to balance the game: X moves first, and O's single shift is
+          It exists to balance the game: X moves first, and O&apos;s single shift is
           the compensation that keeps things fair.
         </p>
       </UIDialog>
