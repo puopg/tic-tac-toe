@@ -29,7 +29,9 @@ game.
   As O it also decides when to spend its one-time grid shift, weighing the shift
   against its best placement each turn.
 - **Scoreboard** tracking wins for each side and draws across rounds.
-- **Win-line highlight** and a clear turn/winner status indicator.
+- **Win-line highlight:** the three winning cells are highlighted and a green
+  line is drawn connecting them, alongside a clear turn/winner status indicator.
+  The same overlay appears in replay.
 - **Completed games & replay:** every finished game is archived and listed on the
   lobby below the active rooms.
   Archived games can no longer be played, but each one can be replayed turn by
@@ -71,6 +73,7 @@ utils/gameLogic.ts        # Pure game logic: winner detection, O's whole-grid
                           #   shift, and the minimax AI
 utils/roomClient.ts       # Browser fetch helpers for the room API
 utils/apiHelpers.ts       # Shared request/response helpers for the room API routes
+utils/winningLineGeometry.ts # Pure winning-line overlay geometry (cell-center percentages)
 lib/roomStore.ts          # In-memory server store (Map on globalThis); all validation
 lib/roomTypes.ts          # Shared room, seat, score, and completed-game types
 lib/usePolling.ts         # Client hook: poll the server on an interval
