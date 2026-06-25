@@ -34,6 +34,8 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 3
 fi
 
+failures=0
+
 # `gh label create --force` creates the label, or updates its color/description
 # when it already exists - so this is idempotent in a single positional call.
 ensure_label() {
@@ -44,6 +46,7 @@ ensure_label() {
     echo "ok:   $name"
   else
     echo "skip: $name (could not create or update)" >&2
+    failures=$((failures + 1))
   fi
 }
 
@@ -55,3 +58,8 @@ ensure_label "priority:low"         "0e8a16" "Agent loop: low priority"
 ensure_label "claude:in-progress"   "1d76db" "Agent loop: claimed and in flight"
 ensure_label "claude:needs-captain" "5319e7" "Agent loop: parked for the captain's decision"
 ensure_label "type:tracking"        "c5def5" "Tracking / non-deliverable; not for the agent"
+
+if [ "$failures" -gt 0 ]; then
+  echo "setup-labels: $failures label(s) could not be created or updated; check gh auth (gh auth status) and repo access" >&2
+  exit 1
+fi
