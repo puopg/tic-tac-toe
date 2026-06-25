@@ -18,6 +18,7 @@ import { usePolling } from "@/lib/usePolling";
 import type { Direction, Player } from "@/utils/gameLogic";
 import { modeLabel, type RoomView } from "@/lib/roomTypes";
 import Board from "@/common/components/Board";
+import BoardHistory from "@/common/components/BoardHistory";
 import Status, { type StatusTone, playerTone } from "@/common/components/Status";
 import Scoreboard from "@/common/components/Scoreboard";
 import styles from "./styles.module.scss";
@@ -329,64 +330,68 @@ const RoomGame = (props: Props) => {
         )}
       </div>
 
-      <div className={styles.boardArea}>
-        <aside
-          className={classNames(styles.sidePanel, {
-            [styles.sideActive]: turnActive("X"),
-          })}
-        >
-          <span className={classNames(styles.sideMark, styles.sideMarkX)}>
-            X
-          </span>
-          <span className={styles.sideName}>{xLabel}</span>
-          <span className={styles.sideAbility}>Plays first</span>
-        </aside>
+      <div className={styles.playArea}>
+        <BoardHistory actions={room.actions} />
 
-        <Board
-          board={room.board}
-          winningLine={room.winningLine}
-          onSquareClick={handleMove}
-          disabled={boardDisabled}
-        />
-
-        <aside
-          className={classNames(styles.sidePanel, {
-            [styles.sideActive]: turnActive("O"),
-          })}
-        >
-          <span className={classNames(styles.sideMark, styles.sideMarkO)}>
-            O
-          </span>
-          <span className={styles.sideName}>{oLabel}</span>
-          <span
-            className={classNames(styles.shiftStatus, {
-              [styles.shiftStatusUsed]: room.oShiftUsed,
+        <div className={styles.boardArea}>
+          <aside
+            className={classNames(styles.sidePanel, {
+              [styles.sideActive]: turnActive("X"),
             })}
           >
-            Grid shift: {room.oShiftUsed ? "used" : "available"}
-          </span>
+            <span className={classNames(styles.sideMark, styles.sideMarkX)}>
+              X
+            </span>
+            <span className={styles.sideName}>{xLabel}</span>
+            <span className={styles.sideAbility}>Plays first</span>
+          </aside>
 
-          {canShiftNow && (
-            <div className={styles.shiftControls}>
-              <p className={styles.shiftControlsHint}>
-                Slide the grid (uses your turn):
-              </p>
-              <div className={styles.shiftGrid}>
-                {SHIFT_OPTIONS.map(({ dir, label }) => (
-                  <button
-                    key={dir}
-                    type="button"
-                    className={styles.shiftButton}
-                    onClick={() => handleShift(dir)}
-                    disabled={paused}
-                  >
-                    {label}
-                  </button>
-                ))}
+          <Board
+            board={room.board}
+            winningLine={room.winningLine}
+            onSquareClick={handleMove}
+            disabled={boardDisabled}
+          />
+
+          <aside
+            className={classNames(styles.sidePanel, {
+              [styles.sideActive]: turnActive("O"),
+            })}
+          >
+            <span className={classNames(styles.sideMark, styles.sideMarkO)}>
+              O
+            </span>
+            <span className={styles.sideName}>{oLabel}</span>
+            <span
+              className={classNames(styles.shiftStatus, {
+                [styles.shiftStatusUsed]: room.oShiftUsed,
+              })}
+            >
+              Grid shift: {room.oShiftUsed ? "used" : "available"}
+            </span>
+
+            {canShiftNow && (
+              <div className={styles.shiftControls}>
+                <p className={styles.shiftControlsHint}>
+                  Slide the grid (uses your turn):
+                </p>
+                <div className={styles.shiftGrid}>
+                  {SHIFT_OPTIONS.map(({ dir, label }) => (
+                    <button
+                      key={dir}
+                      type="button"
+                      className={styles.shiftButton}
+                      onClick={() => handleShift(dir)}
+                      disabled={paused}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </aside>
+            )}
+          </aside>
+        </div>
       </div>
 
       {gameOver && <p className={styles.nextGame}>Next game starting…</p>}

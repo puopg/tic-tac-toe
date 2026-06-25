@@ -95,6 +95,29 @@ seated scheduler (the X seat, falling back to O if X is empty) guarded by a ref 
 the many polling clients/spectators do not double-reset, with a "Next game
 starting…" line shown while it counts down.
 
+To the left of the play area, `RoomGame` renders a `BoardHistory`
+(`common/components/BoardHistory/`) column showing the game's progression - one
+entry per move, oldest at top and newest at bottom. The history is the outermost
+left column: `RoomGame` wraps `BoardHistory` and the existing `boardArea` in a
+`playArea` grid (`minmax(0,150px) minmax(0,1fr)`) so the X/O side panels still
+flank the board directly; under 900px the `playArea` collapses to one column and
+the history stacks above the board (the inner `boardArea` keeps its own 640px
+collapse). `BoardHistory` takes only `actions: GameAction[]` and derives each
+historical board with `boardAfterActions(actions, i + 1)` (rendered through the
+shared `MiniBoard`, which draws any winning line) - the same action-log
+reconstruction the replay view uses, so it is never a second board renderer.
+Each entry's player+move label comes from the pure `describeAction(action, index)`
+helper in `utils/historyLabels.ts` (covered by `utils/historyLabels.test.ts`),
+which assigns X to even indices and O to odd ones and produces a compact move
+string - a named cell via `cellName` (e.g. "center", "top-left") for a placement,
+or "shift <direction>" for O's grid shift. The whole panel is faded
+(`opacity: 0.4`) by default and animates to full opacity on `:hover`/`:focus-within`;
+its bounded list (`max-height`, hidden scrollbar) is scrolled by up/down arrow
+buttons that disable at the ends, and a layout effect keeps the newest move
+scrolled into view as the game advances. The panel renders nothing until there is
+at least one move. Reuse `describeAction`/`cellName` for any other per-action
+labeling rather than re-deriving the player-parity or cell-naming rules.
+
 Each room records its history as a single ordered `actions` log, where each
 action is either `{ kind: "place", index }` or `{ kind: "shift", dir }` and the
 player alternates strictly (X takes the even-indexed actions, O the odd ones).
