@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
-    "select-tickets": "tsx scripts/agent-loop/selectTickets.cli.ts"
+    "select-tickets": "tsx scripts/agent-loop/selectTickets.cli.ts",
+    "set-project-status": "tsx scripts/agent-loop/setProjectStatus.cli.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.17",

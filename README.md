@@ -71,6 +71,8 @@ Then open [http://localhost:3000](http://localhost:3000).
 - `npm test` - run the Vitest unit suite once
 - `npm run select-tickets` - agent-loop ticket selector CLI (reads `gh issue list`
   JSON on stdin, prints the chosen issue numbers; see [docs/agent-loop.md](./docs/agent-loop.md))
+- `npm run set-project-status` - best-effort Projects v2 board-sync CLI
+  (`--issue N --status "In Progress"`; no-ops without `PROJECTS_TOKEN`; see [docs/agent-loop.md](./docs/agent-loop.md))
 
 ## Project structure
 
@@ -91,8 +93,8 @@ lib/roomTypes.ts          # Shared room, seat, score, and completed-game types
 lib/usePolling.ts         # Client hook: poll the server on an interval
 lib/usePlayerId.ts        # Client hook: stable per-browser player id
 constants/game.ts         # Cross-cutting domain constants (board size, AI seat sentinel)
-scripts/agent-loop/       # Opt-in CI "issue -> PR" loop: ticket selector + label setup
-.github/workflows/        # Agent loop dispatch + PR responder workflows (see docs/agent-loop.md)
+scripts/agent-loop/       # Opt-in CI "issue -> PR" loop: ticket selector, label setup, board sync
+.github/workflows/        # Agent loop dispatch + Claude Code app workflows (see docs/agent-loop.md)
 ```
 
 See [AGENTS.md](./AGENTS.md) for contribution conventions (notably the styling

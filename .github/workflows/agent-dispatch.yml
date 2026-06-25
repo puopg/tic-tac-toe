@@ -125,6 +125,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Best-effort board sync: move the ticket's Projects v2 card to
+      # "In Progress" now that it is claimed. Guarded twice - continue-on-error
+      # here and the script's own non-fatal behavior - so a missing
+      # PROJECTS_TOKEN, no project, or any API error can never fail this job.
+      - name: Set board status to In Progress
+        continue-on-error: true
+        env:
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+        run: |
+          npm run --silent set-project-status -- --issue "$ISSUE_NUMBER" --status "In Progress"
+
       - name: Install no-mistakes CLI
         run: |
           curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh
@@ -133,7 +144,11 @@ jobs:
       - name: Run agent (implement + no-mistakes -> PR)
         uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Authenticate with the Claude Code OAuth token (your Claude subscription)
+          # rather than a metered ANTHROPIC_API_KEY. Set up by the Claude Code GitHub
+          # installer and stored as the CLAUDE_CODE_OAUTH_TOKEN secret - the same
+          # credential the installer-provided claude.yml / claude-code-review.yml use.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
           show_full_output: true
           prompt: |
@@ -172,3 +187,25 @@ jobs:
             --add-label "claude:needs-captain" || true
           gh issue comment "$ISSUE_NUMBER" \
             --body "The agent finished without opening a PR (a failed run, a risky finding it stopped on, or no change needed). Parked for the captain." || true
+
+      # Best-effort board sync mirroring the park decision: an open PR moves the
+      # card to "In Review"; otherwise it moves to "Needs captain" alongside the
+      # claude:needs-captain label set above. Runs on always() (so it follows a
+      # failed/timed-out agent run too) and never fails the job. The merge ->
+      # Done transition is left to GitHub Projects' native workflow.
+      - name: Sync board status (In Review or Needs captain)
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+        run: |
+          set -u
+          pr_count="$(gh pr list --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null)" || pr_count=""
+          if printf '%s' "$pr_count" | grep -qE '^[0-9]+$' && [ "$pr_count" -gt 0 ]; then
+            status="In Review"
+          else
+            status="Needs captain"
+          fi
+          echo "Setting board status to: $status"
+          npm run --silent set-project-status -- --issue "$ISSUE_NUMBER" --status "$status"
