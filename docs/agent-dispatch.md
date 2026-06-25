@@ -1,4 +1,4 @@
-# Agent issue dispatch
+# Trigger Coder Agent
 
 An opt-in, scheduled loop that turns Kanban tickets into reviewable pull requests.
 
@@ -108,14 +108,14 @@ which auto-detects the runner's platform build and puts `no-mistakes` on `PATH` 
 
 The agent loop drives issue **labels** (`claude:in-progress`, `claude:needs-captain`).
 On a GitHub Projects v2 board, the *column* a card sits in is driven by the project's single-select **Status** field, not by labels.
-The board's Status field is used in two directions, both via the `PROJECTS_TOKEN` PAT:
+The board's Status field is used in two directions, both via a `PROJECTS_TOKEN` minted at runtime from the `PROJECTS_APP` GitHub App:
 
 - **Read (selection gate).** The selector reads each labelled issue's Status and only works tickets in the `Ready` column - see [Opt-in](#opt-in-label-and-ready-column). This is **not** optional once the gate is on: it is fail-closed, so without a working `PROJECTS_TOKEN` and a `Ready` Status option the loop selects nothing.
 - **Write (board sync).** As the agent works, the workflow moves the card's Status to mirror the label lifecycle. This direction is entirely best-effort: if it is not configured the loop still runs and nothing fails.
 
 To enable both:
 
-1. **Secret.** Add a `PROJECTS_TOKEN` repository secret: a fine-grained personal access token with **Projects** read+write permission (the default `GITHUB_TOKEN` cannot read or write user/org Projects v2, which is why a separate PAT is needed - this uses a PAT, not OIDC).
+1. **Secrets.** Register a GitHub App with **Projects** read+write (organization) permission, install it on the org, and add its credentials as two repository secrets: `PROJECTS_APP_ID` and `PROJECTS_APP_PRIVATE_KEY`. Each job mints a short-lived, owner-scoped installation token from them (via `actions/create-github-app-token`) and passes it to the scripts as `PROJECTS_TOKEN`. A GitHub App is used rather than a PAT because the default `GITHUB_TOKEN` cannot read or write user/org Projects v2, and an App token is short-lived and not tied to a single user.
 2. **Status options.** On the project, the **Status** field must offer a `Ready` option (the selection gate) plus `In Progress`, `In Review`, and `Needs captain` (board sync), all matched case-insensitively.
    `Backlog` (or any other non-`Ready` column) needs no special option - it is simply "not Ready" to the gate.
    `Done` is **not** required here: the merge -> `Done` transition is handled natively by GitHub Projects' built-in "pull request merged / item closed -> Done" workflow, and tickets close via `Closes #<n>` in the PR body.

@@ -343,9 +343,11 @@ Conventions worth preserving when touching this code:
   (`scripts/agent-dispatch/setProjectStatus.ts`, tested by `setProjectStatus.test.ts`,
   CLI `setProjectStatus.cli.ts` / `npm run set-project-status`) to move the card:
   `In Progress` after claim, `In Review` when a PR is open, `Needs captain` on the
-  park path. It authenticates with a separate
-  `PROJECTS_TOKEN` PAT (the default `GITHUB_TOKEN` cannot write user/org Projects
-  v2) and matches the `Status` option name case-insensitively. The helper, its CLI,
+  park path. It authenticates with a `PROJECTS_TOKEN` that each job mints at
+  runtime from the `PROJECTS_APP` GitHub App (`PROJECTS_APP_ID` +
+  `PROJECTS_APP_PRIVATE_KEY`, via `actions/create-github-app-token`) because the
+  default `GITHUB_TOKEN` cannot write user/org Projects v2, and matches the
+  `Status` option name case-insensitively. The helper, its CLI,
   and the workflow steps (`continue-on-error: true`) are all non-fatal: a missing
   token, no project, a missing option, or any API error logs and no-ops, never
   failing the loop. `Done` is intentionally not driven here - GitHub Projects'

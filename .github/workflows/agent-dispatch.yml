@@ -1,4 +1,4 @@
-name: Agent issue dispatch
+name: Trigger Coder Agent
 
 # Twice a day (and on demand), pick up to 3 opt-in tickets by priority, claim
 # them so a later run won't re-pull them, and run one agent per ticket. Each
@@ -42,6 +42,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Mint a short-lived Projects v2 token from the PROJECTS_APP GitHub App
+      # (the default GITHUB_TOKEN cannot read/write user/org Projects v2). The
+      # owner-scoped installation token carries the app's organization_projects
+      # permission, which the Ready-column gate below reads through. If the app
+      # secrets are absent the step still runs but yields an empty token, so the
+      # gate simply fails closed - never blocks the job.
+      - name: Mint Projects token
+        id: projects_token
+        uses: actions/create-github-app-token@v1
+        continue-on-error: true
+        with:
+          app-id: ${{ secrets.PROJECTS_APP_ID }}
+          private-key: ${{ secrets.PROJECTS_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -70,7 +85,7 @@ jobs:
       # stderr; stdout is the enriched JSON we feed forward.
       - name: Annotate with board status (Ready-column gate)
         env:
-          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          PROJECTS_TOKEN: ${{ steps.projects_token.outputs.token }}
         run: |
           set -eu
           npx tsx scripts/agent-dispatch/enrichIssueStatus.cli.ts < issues.json > issues-with-status.json
@@ -118,6 +133,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Mint the Projects v2 token from the PROJECTS_APP GitHub App for this job's
+      # board-sync steps (the default GITHUB_TOKEN cannot write Projects v2). The
+      # owner-scoped installation token carries organization_projects. Non-fatal:
+      # absent app secrets yield an empty token and the sync steps (already
+      # continue-on-error) just no-op.
+      - name: Mint Projects token
+        id: projects_token
+        uses: actions/create-github-app-token@v1
+        continue-on-error: true
+        with:
+          app-id: ${{ secrets.PROJECTS_APP_ID }}
+          private-key: ${{ secrets.PROJECTS_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
       - name: Claim ticket
         env:
           GH_TOKEN: ${{ github.token }}
@@ -151,7 +180,7 @@ jobs:
       - name: Set board status to In Progress
         continue-on-error: true
         env:
-          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          PROJECTS_TOKEN: ${{ steps.projects_token.outputs.token }}
         run: |
           npm run --silent set-project-status -- --issue "$ISSUE_NUMBER" --status "In Progress"
 
@@ -251,7 +280,7 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          PROJECTS_TOKEN: ${{ steps.projects_token.outputs.token }}
         run: |
           set -u
           pr_count="$(gh pr list --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null)" || pr_count=""
