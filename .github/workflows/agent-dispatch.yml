@@ -116,6 +116,14 @@ jobs:
           set -eu
           gh issue view "$ISSUE_NUMBER" --json number,title,body,url > ticket.json
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Install no-mistakes CLI
         run: |
           curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh

@@ -74,6 +74,16 @@ jobs:
           ref: ${{ steps.pr.outputs.branch }}
           fetch-depth: 0
 
+      - uses: actions/setup-node@v4
+        if: steps.pr.outputs.go == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.pr.outputs.go == 'true'
+        run: npm ci
+
       - name: Install no-mistakes CLI
         if: steps.pr.outputs.go == 'true'
         run: |
