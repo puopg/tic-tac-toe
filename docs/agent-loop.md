@@ -63,9 +63,15 @@ The responder job (`agent-respond.yml`) has the same 30-minute bound.
 
 1. **Labels.** Run `scripts/agent-loop/setup-labels.sh` (optionally `--repo owner/name`) to create the labels idempotently.
 2. **API key.** Add an `ANTHROPIC_API_KEY` repository secret (Settings -> Secrets and variables -> Actions).
-3. **no-mistakes installer.** Set a repository variable `NO_MISTAKES_INSTALL_CMD` to the shell command that installs the `no-mistakes` CLI in an Ubuntu runner.
-   The workflows run it before invoking the agent and fail with a clear message if it is unset.
-   Confirm the exact command during the dry-run below.
+3. **no-mistakes installer.** Set a repository variable `NO_MISTAKES_INSTALL_CMD` to the command that installs the `no-mistakes` CLI on an Ubuntu runner:
+
+   ```sh
+   curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh
+   ```
+
+   The installer auto-detects the runner's platform build and puts `no-mistakes` on `PATH`.
+   The workflows run this command before invoking the agent and fail with a clear message if the variable is unset.
+   Confirm it during the dry-run below.
 
 ## Rollout
 

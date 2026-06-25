@@ -12,7 +12,9 @@
 #   claude:needs-captain  parked for the captain (a risky finding, or a failed run)
 #   type:tracking         optional marker for non-deliverable / tracking tickets
 #
-# Uses gh-axi when available, else gh. Requires GitHub auth.
+# Uses plain `gh` (present on GitHub runners and locally). NOT gh-axi: its
+# `label create` requires `--name`, so the positional form below would fail.
+# Requires GitHub auth.
 # Usage: scripts/agent-loop/setup-labels.sh [--repo <owner/name>]
 set -eu
 
@@ -27,27 +29,21 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-GH=gh
-command -v gh-axi >/dev/null 2>&1 && GH=gh-axi
-if ! command -v "$GH" >/dev/null 2>&1; then
-  echo "setup-labels: need gh-axi or gh on PATH" >&2
+if ! command -v gh >/dev/null 2>&1; then
+  echo "setup-labels: need gh on PATH" >&2
   exit 3
 fi
 
+# `gh label create --force` creates the label, or updates its color/description
+# when it already exists - so this is idempotent in a single positional call.
 ensure_label() {
   name="$1"; color="$2"; desc="$3"
-  set -- label create "$name" --color "$color" --description "$desc"
+  set -- label create "$name" --color "$color" --description "$desc" --force
   [ -n "$REPO" ] && set -- "$@" --repo "$REPO"
-  if "$GH" "$@" >/dev/null 2>&1; then
-    echo "created: $name"
-    return
-  fi
-  set -- label edit "$name" --color "$color" --description "$desc"
-  [ -n "$REPO" ] && set -- "$@" --repo "$REPO"
-  if "$GH" "$@" >/dev/null 2>&1; then
-    echo "updated: $name"
+  if gh "$@" >/dev/null 2>&1; then
+    echo "ok:   $name"
   else
-    echo "skip:    $name (could not create or update)" >&2
+    echo "skip: $name (could not create or update)" >&2
   fi
 }
 
