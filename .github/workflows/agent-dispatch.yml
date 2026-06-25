@@ -76,6 +76,9 @@ jobs:
     needs: select
     if: needs.select.outputs.numbers != '[]'
     runs-on: ubuntu-latest
+    # Bound a hung claude-code-action run so it cannot strand a ticket in
+    # claude:in-progress (the if: always() park step below still runs on timeout).
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: 3

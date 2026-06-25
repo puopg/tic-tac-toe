@@ -28,6 +28,8 @@ jobs:
   respond:
     name: Address PR feedback
     runs-on: ubuntu-latest
+    # Bound a hung claude-code-action run so it cannot hold a runner indefinitely.
+    timeout-minutes: 30
     # Owner-only loop guard: react only to the repo owner, and only to a
     # changes-requested review or an @claude mention on a PR comment.
     if: >-
