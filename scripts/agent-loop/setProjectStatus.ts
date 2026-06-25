@@ -75,8 +75,10 @@ type IssueProjectItemsData = {
 };
 
 // Fetch the issue's Projects v2 items, each with its project's "Status"
-// single-select field and that field's options. A project whose Status field is
-// a different field type, or absent, yields `field: null` and is skipped.
+// single-select field and that field's options. A project with no "Status" field
+// yields `field: null`; a "Status" field that is not a single-select type matches
+// no inline fragment and yields an empty object with no `options` array. Both are
+// skipped.
 const ISSUE_PROJECT_ITEMS_QUERY = `
   query IssueProjectItems($owner: String!, $repo: String!, $number: Int!) {
     repository(owner: $owner, name: $repo) {
@@ -153,7 +155,7 @@ export const setProjectStatus = async (
       const project = item.project;
       const label = project.title ?? project.id;
       const field = project.field;
-      if (!field) {
+      if (!field || !Array.isArray(field.options)) {
         log(
           `set-project-status: skipped project "${label}" - no "Status" single-select field.`,
         );

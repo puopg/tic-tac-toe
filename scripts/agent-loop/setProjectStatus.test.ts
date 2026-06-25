@@ -158,6 +158,36 @@ describe("setProjectStatus", () => {
     );
   });
 
+  it("skips a Status field that is not single-select (empty inline fragment)", async () => {
+    const mutations: Record<string, unknown>[] = [];
+    const graphql = (async (query: string, variables: Record<string, unknown>) => {
+      if (isMutation(query)) {
+        mutations.push(variables);
+        return { updateProjectV2ItemFieldValue: { projectV2Item: { id: "x" } } };
+      }
+      return {
+        repository: {
+          issue: {
+            projectItems: {
+              nodes: [
+                { id: "item-1", project: { id: "proj-1", title: "Board", field: {} } },
+              ],
+            },
+          },
+        },
+      };
+    }) as GraphQLExecutor;
+    const log = vi.fn();
+
+    const result = await setProjectStatus({ ...baseParams, graphql, log });
+
+    expect(result.updated).toBe(0);
+    expect(mutations).toHaveLength(0);
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining('no "Status" single-select field'),
+    );
+  });
+
   it("skips a project with no option matching the target status", async () => {
     const { graphql, mutations } = mockGraphql([
       {
