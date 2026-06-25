@@ -90,4 +90,59 @@ describe("selectTickets", () => {
     expect(() => selectTickets([], { max: -1 })).toThrow();
     expect(() => selectTickets([], { max: 1.5 })).toThrow();
   });
+
+  describe("requireReadyStatus gate", () => {
+    /** A ready-labelled, prioritised open issue carrying a board status. */
+    const withStatus = (number: number, status?: string): Issue => ({
+      number,
+      createdAt: T0,
+      state: "OPEN",
+      labels: [{ name: "agent:ready" }, { name: "priority:high" }],
+      status,
+    });
+
+    it("ignores status when the gate is off (label-only, unchanged)", () => {
+      const issues = [withStatus(1, "Backlog"), withStatus(2, "Ready")];
+      expect(selectTickets(issues, { max: 3 })).toEqual([1, 2]);
+    });
+
+    it("keeps only Ready-column tickets when the gate is on", () => {
+      const issues = [withStatus(1, "Backlog"), withStatus(2, "Ready")];
+      expect(
+        selectTickets(issues, { max: 3, requireReadyStatus: true }),
+      ).toEqual([2]);
+    });
+
+    it("matches the Ready status case-insensitively", () => {
+      const issues = [withStatus(1, "ready"), withStatus(2, "READY")];
+      expect(
+        selectTickets(issues, { max: 3, requireReadyStatus: true }),
+      ).toEqual([1, 2]);
+    });
+
+    it("treats a missing or unknown status as not Ready (fail closed)", () => {
+      const issues = [
+        withStatus(1, undefined),
+        withStatus(2, ""),
+        withStatus(3, "In Progress"),
+        withStatus(4, "Ready"),
+      ];
+      expect(
+        selectTickets(issues, { max: 3, requireReadyStatus: true }),
+      ).toEqual([4]);
+    });
+
+    it("still requires the agent:ready label even when in the Ready column", () => {
+      const labelless: Issue = {
+        number: 5,
+        createdAt: T0,
+        state: "OPEN",
+        labels: [{ name: "priority:high" }],
+        status: "Ready",
+      };
+      expect(
+        selectTickets([labelless], { max: 3, requireReadyStatus: true }),
+      ).toEqual([]);
+    });
+  });
 });

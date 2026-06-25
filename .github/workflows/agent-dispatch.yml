@@ -5,9 +5,14 @@ name: Agent issue dispatch
 # agent implements its ticket, runs no-mistakes, and opens a PR. Nothing merges
 # automatically - every PR waits for the captain.
 #
-# Opt-in: a ticket is eligible ONLY while it carries the `agent:ready` label and
-# is not already `claude:in-progress` / `claude:needs-captain`. Tickets without
-# `agent:ready` (backfills, tracking issues) are invisible to this workflow.
+# Opt-in: a ticket is eligible ONLY while it carries the `agent:ready` label AND
+# its card sits in the board's "Ready" column (Projects v2 Status = "Ready"), and
+# is not already `claude:in-progress` / `claude:needs-captain`. The two gates are
+# independent: the label marks a ticket automatable, the Ready column says "work
+# it now", so an ordinary board needs no column<->label automation. Tickets
+# without `agent:ready`, or parked in Backlog/any non-Ready column, are invisible.
+# The Ready-column gate reads Projects v2 via PROJECTS_TOKEN and is fail-closed: a
+# status that cannot be read counts as not-Ready, so nothing is wrongly picked.
 
 on:
   schedule:
@@ -45,7 +50,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: List eligible issues
+      - name: List label-eligible issues
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -55,8 +60,22 @@ jobs:
             --label "agent:ready" \
             --json number,title,labels,createdAt,state \
             --limit 100 > issues.json
-          echo "Eligible (pre-cap):"
+          echo "agent:ready labelled (pre column-gate):"
           node -e 'JSON.parse(require("fs").readFileSync("issues.json","utf8")).forEach(i => console.log(`  #${i.number} ${i.title}`))'
+
+      # Annotate each labelled issue with its Projects v2 board Status so the
+      # selector can keep only the ones in the "Ready" column. Fail-closed: with
+      # no PROJECTS_TOKEN or an unreadable status, the issue carries no status and
+      # the --require-ready-status selector below skips it. Diagnostics go to
+      # stderr; stdout is the enriched JSON we feed forward.
+      - name: Annotate with board status (Ready-column gate)
+        env:
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+        run: |
+          set -eu
+          npx tsx scripts/agent-dispatch/enrichIssueStatus.cli.ts < issues.json > issues-with-status.json
+          echo "Board status per labelled issue:"
+          node -e 'JSON.parse(require("fs").readFileSync("issues-with-status.json","utf8")).forEach(i => console.log(`  #${i.number} ${i.title} -> ${i.status ?? "(no status)"}`))'
 
       - name: Pick top tickets
         id: pick
@@ -67,7 +86,7 @@ jobs:
           MAX_INPUT: ${{ github.event.inputs.max || '3' }}
         run: |
           set -eu
-          numbers="$(npx tsx scripts/agent-loop/selectTickets.cli.ts --max "$MAX_INPUT" < issues.json)"
+          numbers="$(npx tsx scripts/agent-dispatch/selectTickets.cli.ts --max "$MAX_INPUT" --require-ready-status < issues-with-status.json)"
           echo "Selected: $numbers"
           echo "numbers=$numbers" >> "$GITHUB_OUTPUT"
 
@@ -183,7 +202,7 @@ jobs:
           EXECUTION_FILE: ${{ steps.agent.outputs.execution_file }}
         run: |
           set -u
-          npx tsx scripts/agent-loop/agentRunReport.cli.ts \
+          npx tsx scripts/agent-dispatch/agentRunReport.cli.ts \
             --mode transcript \
             --execution-file "$EXECUTION_FILE" \
             --title "Agent run - issue #$ISSUE_NUMBER" >> "$GITHUB_STEP_SUMMARY"
@@ -214,7 +233,7 @@ jobs:
           # Build the diagnostic comment from the agent's own final message; fall
           # back to a generic body if the reporter itself ever fails, so the
           # comment is never empty.
-          npx tsx scripts/agent-loop/agentRunReport.cli.ts \
+          npx tsx scripts/agent-dispatch/agentRunReport.cli.ts \
             --mode comment \
             --execution-file "$EXECUTION_FILE" \
             --outcome "$AGENT_OUTCOME" \

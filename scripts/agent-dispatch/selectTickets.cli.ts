@@ -7,13 +7,17 @@
 // logic lives in the pure selectTickets() module; this file only does argument
 // parsing, stdin reading, and formatting.
 //
-// Usage: tsx selectTickets.cli.ts [--max N] [--format json|lines] < issues.json
+// Usage: tsx selectTickets.cli.ts [--max N] [--format json|lines] [--require-ready-status] < issues.json
+//
+// With --require-ready-status, an issue must also carry a board Status of "Ready"
+// (its `status` field, populated upstream by enrichIssueStatus.cli) to be picked.
 
 import { selectTickets, type Issue } from "./selectTickets";
 
 type Format = "json" | "lines";
 
-const USAGE = "usage: select-tickets [--max N] [--format json|lines] < issues.json";
+const USAGE =
+  "usage: select-tickets [--max N] [--format json|lines] [--require-ready-status] < issues.json";
 
 /** Print to stderr and exit; the `never` return lets callers treat it as fatal. */
 const fail = (message: string, code: number): never => {
@@ -21,11 +25,14 @@ const fail = (message: string, code: number): never => {
   process.exit(code);
 };
 
-const parseArgs = (argv: string[]): { max: number; format: Format } => {
+const parseArgs = (
+  argv: string[],
+): { max: number; format: Format; requireReadyStatus: boolean } => {
   // FM_AGENT_MAX_TICKETS mirrors the env override documented for the loop; the
   // workflow passes --max explicitly, which takes precedence.
   let maxRaw = process.env.FM_AGENT_MAX_TICKETS ?? "3";
   let format: Format = "json";
+  let requireReadyStatus = false;
 
   let i = 0;
   while (i < argv.length) {
@@ -48,6 +55,10 @@ const parseArgs = (argv: string[]): { max: number; format: Format } => {
         i += 2;
         break;
       }
+      case "--require-ready-status":
+        requireReadyStatus = true;
+        i += 1;
+        break;
       case "-h":
       case "--help":
         process.stdout.write(`${USAGE}\n`);
@@ -60,7 +71,7 @@ const parseArgs = (argv: string[]): { max: number; format: Format } => {
   if (!/^\d+$/.test(maxRaw)) {
     fail("--max must be a non-negative integer", 2);
   }
-  return { max: Number(maxRaw), format };
+  return { max: Number(maxRaw), format, requireReadyStatus };
 };
 
 const readStdin = async (): Promise<string> => {
@@ -88,9 +99,9 @@ const parseIssues = (raw: string): Issue[] => {
 };
 
 const main = async (): Promise<void> => {
-  const { max, format } = parseArgs(process.argv.slice(2));
+  const { max, format, requireReadyStatus } = parseArgs(process.argv.slice(2));
   const issues = parseIssues(await readStdin());
-  const numbers = selectTickets(issues, { max });
+  const numbers = selectTickets(issues, { max, requireReadyStatus });
 
   if (format === "lines") {
     const body = numbers.join("\n");

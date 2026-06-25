@@ -8,9 +8,10 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
-    "select-tickets": "tsx scripts/agent-loop/selectTickets.cli.ts",
-    "set-project-status": "tsx scripts/agent-loop/setProjectStatus.cli.ts",
-    "agent-run-report": "tsx scripts/agent-loop/agentRunReport.cli.ts"
+    "select-tickets": "tsx scripts/agent-dispatch/selectTickets.cli.ts",
+    "enrich-issue-status": "tsx scripts/agent-dispatch/enrichIssueStatus.cli.ts",
+    "set-project-status": "tsx scripts/agent-dispatch/setProjectStatus.cli.ts",
+    "agent-run-report": "tsx scripts/agent-dispatch/agentRunReport.cli.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.17",

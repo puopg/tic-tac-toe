@@ -246,8 +246,11 @@ components.
 - `npm run build` - production build
 - `npm run lint` - run ESLint
 - `npm test` - run the Vitest unit suite once (`vitest run`)
-- `npm run select-tickets` - run the agent-loop ticket selector CLI (reads a
+- `npm run select-tickets` - run the agent-dispatch ticket selector CLI (reads a
   `gh issue list` JSON payload on stdin, prints the chosen issue numbers)
+- `npm run enrich-issue-status` - annotate the issue JSON on stdin with each
+  issue's Projects v2 board Status for the selector's Ready-column gate
+  (fail-closed; no-ops to label-only data without `PROJECTS_TOKEN`)
 - `npm run set-project-status` - run the best-effort Projects v2 board-sync CLI
   (`--issue N --status "In Progress"`; non-fatal, no-ops without `PROJECTS_TOKEN`)
 
@@ -266,32 +269,48 @@ polling, and React rendering are intentionally out of scope here.
 ## Agent issue loop (CI)
 
 An opt-in, scheduled "issue -> PR" loop lives under `.github/workflows/` and
-`scripts/agent-loop/`; it is independent of the game runtime. The captain labels
-issues `agent:ready` (plus a `priority:*`); twice daily `agent-dispatch.yml`
+`scripts/agent-dispatch/`; it is independent of the game runtime. The captain labels
+issues `agent:ready` (plus a `priority:*`) **and** drags their card into the
+board's "Ready" column; twice daily `agent-dispatch.yml`
 selects up to three, claims each (`claude:in-progress`, drop `agent:ready`),
 runs one `anthropics/claude-code-action@v1` agent per ticket on branch
 `fm/issue-<n>`, and lets `/no-mistakes` open the PR. PR follow-ups are handled by
 the Claude Code GitHub installer's own workflows (`claude.yml`, which wakes an
 agent on an `@claude` mention, and `claude-code-review.yml`), not by a workflow we
 own. Nothing is ever merged automatically. Full operator docs are in
-`docs/agent-loop.md`.
+`docs/agent-dispatch.md`.
 
 Conventions worth preserving when touching this code:
 
-- **Selection is a pure, tested TS function.** `scripts/agent-loop/selectTickets.ts`
-  exposes `selectTickets(issues, { max })` (opt-in gate, priority order, FIFO
-  tiebreak, cap), covered by `selectTickets.test.ts`. The workflow calls it only
-  through the thin CLI `selectTickets.cli.ts` (run via `tsx`, also
-  `npm run select-tickets`), which reads `gh issue list` JSON on stdin and prints
-  a JSON array of numbers. Keep all eligibility/ordering logic in the pure module,
-  not in YAML.
+- **Selection is a pure, tested TS function.** `scripts/agent-dispatch/selectTickets.ts`
+  exposes `selectTickets(issues, { max, requireReadyStatus })` (opt-in gate,
+  priority order, FIFO tiebreak, cap), covered by `selectTickets.test.ts`. The
+  workflow calls it only through the thin CLI `selectTickets.cli.ts` (run via
+  `tsx`, also `npm run select-tickets`), which reads `gh issue list` JSON on stdin
+  and prints a JSON array of numbers. Keep all eligibility/ordering logic in the
+  pure module, not in YAML.
+- **Two independent eligibility gates: the `agent:ready` label and the "Ready"
+  board column.** The label (read by `gh issue list --label`) marks a ticket
+  automatable; the column (Projects v2 `Status == "Ready"`, case-insensitive)
+  says work it now. With `requireReadyStatus`, `selectTickets` drops any issue
+  whose `status` is not `Ready`, treating unknown/missing status as not Ready
+  (**fail closed** - never auto-pick a card we cannot place in Ready). The status
+  is read by the pure `getProjectStatus` helper (`getProjectStatus.ts`, tested by
+  `getProjectStatus.test.ts`) and injected onto each issue by the thin
+  `enrichIssueStatus.cli.ts` (`npm run enrich-issue-status`) *before* selection,
+  so `selectTickets` itself stays pure and offline. The dispatch `select` job
+  pipes `gh issue list` -> enrich -> `selectTickets.cli --require-ready-status`.
+  Both Projects v2 CLIs share one fetch-backed executor, `makeGithubGraphql`
+  (`githubGraphql.ts`), authenticated with `PROJECTS_TOKEN`. Unlike board sync,
+  this read is a real gate: with no `PROJECTS_TOKEN` (or no `Ready` option) the
+  loop selects nothing rather than falling back to label-only.
 - **Read-only select, per-ticket claim, resilient park.** The dispatch `select`
   job never mutates labels; each `work` job claims as its first step and, with
   `if: always()`, parks to `claude:needs-captain` unless a PR for its branch is
   *confirmed* open (park on any uncertainty - never strand a claim).
 - **Run diagnostics from the execution_file, in tested TS.** The dispatch job
   reads `claude-code-action@v1`'s `execution_file` output through the pure
-  `agentRunReport` helper (`scripts/agent-loop/agentRunReport.ts`, tested by
+  `agentRunReport` helper (`scripts/agent-dispatch/agentRunReport.ts`, tested by
   `agentRunReport.test.ts`, CLI `agentRunReport.cli.ts` / `npm run
   agent-run-report`): `formatTranscript` renders a clean Claude-and-tools
   conversation (tool-result blocks dropped) onto the run Summary, and
@@ -316,12 +335,12 @@ Conventions worth preserving when touching this code:
 - The `no-mistakes` CLI is installed on the runner by the dispatch workflow's
   "Install no-mistakes CLI" step (the hardcoded `docs/install.sh` curl one-liner);
   the only one-time setup is the `CLAUDE_CODE_OAUTH_TOKEN` secret (from the Claude
-  Code GitHub installer) and running `scripts/agent-loop/setup-labels.sh`
+  Code GitHub installer) and running `scripts/agent-dispatch/setup-labels.sh`
   (idempotent, plain `gh`) to create labels.
 - **Board sync is best-effort and label-independent.** Projects v2 columns are
   driven by the project's single-select `Status` field, not by labels, so the
   workflows also call the pure `setProjectStatus(...)` helper
-  (`scripts/agent-loop/setProjectStatus.ts`, tested by `setProjectStatus.test.ts`,
+  (`scripts/agent-dispatch/setProjectStatus.ts`, tested by `setProjectStatus.test.ts`,
   CLI `setProjectStatus.cli.ts` / `npm run set-project-status`) to move the card:
   `In Progress` after claim, `In Review` when a PR is open, `Needs captain` on the
   park path. It authenticates with a separate
@@ -331,3 +350,7 @@ Conventions worth preserving when touching this code:
   token, no project, a missing option, or any API error logs and no-ops, never
   failing the loop. `Done` is intentionally not driven here - GitHub Projects'
   native "PR merged / item closed -> Done" workflow handles it via `Closes #<n>`.
+  Note the same `PROJECTS_TOKEN` is *also* used to read the `Status` for the
+  Ready-column selection gate above; that read is fail-closed, so unlike this
+  write path it is not optional once `requireReadyStatus` is on (the project then
+  needs a `Ready` Status option alongside `In Progress`/`In Review`/`Needs captain`).

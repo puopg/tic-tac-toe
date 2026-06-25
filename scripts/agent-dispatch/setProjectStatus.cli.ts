@@ -1,4 +1,4 @@
-// Thin CLI wrapper around setProjectStatus(), called by the agent-loop
+// Thin CLI wrapper around setProjectStatus(), called by the agent-dispatch
 // workflows as a best-effort step to move an issue's card on the Projects v2
 // board (e.g. to "In Progress" right after claiming a ticket).
 //
@@ -13,7 +13,8 @@
 //   - PROJECTS_TOKEN  (required to do anything; unset -> logged no-op, exit 0)
 //   - GITHUB_REPOSITORY  (owner/name; used when --repo is omitted)
 
-import { setProjectStatus, type GraphQLExecutor } from "./setProjectStatus";
+import { setProjectStatus } from "./setProjectStatus";
+import { makeGithubGraphql } from "./githubGraphql";
 
 const USAGE =
   'usage: set-project-status --issue N --status "In Progress" [--repo owner/name]';
@@ -75,32 +76,6 @@ const parseArgs = (argv: string[]): Args => {
   return { issue: Number(issueRaw), status: status as string, repo };
 };
 
-/** Build a fetch-backed GraphQL executor authenticated with PROJECTS_TOKEN. */
-const makeGraphql = (token: string): GraphQLExecutor => {
-  return async <T>(query: string, variables: Record<string, unknown>) => {
-    const response = await fetch("https://api.github.com/graphql", {
-      method: "POST",
-      headers: {
-        Authorization: `bearer ${token}`,
-        "Content-Type": "application/json",
-        "User-Agent": "tic-tac-toe-agent-loop",
-      },
-      body: JSON.stringify({ query, variables }),
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} ${response.statusText}`);
-    }
-    const body = (await response.json()) as {
-      data?: T;
-      errors?: { message: string }[];
-    };
-    if (body.errors && body.errors.length > 0) {
-      throw new Error(body.errors.map((e) => e.message).join("; "));
-    }
-    return body.data as T;
-  };
-};
-
 const main = async (): Promise<void> => {
   const { issue, status, repo: repoArg } = parseArgs(process.argv.slice(2));
 
@@ -124,7 +99,7 @@ const main = async (): Promise<void> => {
     repo: name,
     issueNumber: issue,
     statusName: status,
-    graphql: makeGraphql(token),
+    graphql: makeGithubGraphql(token),
     log,
   });
 };

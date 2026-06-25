@@ -69,10 +69,13 @@ Then open [http://localhost:3000](http://localhost:3000).
 - `npm run start` - run the production build
 - `npm run lint` - lint the codebase
 - `npm test` - run the Vitest unit suite once
-- `npm run select-tickets` - agent-loop ticket selector CLI (reads `gh issue list`
-  JSON on stdin, prints the chosen issue numbers; see [docs/agent-loop.md](./docs/agent-loop.md))
+- `npm run select-tickets` - agent-dispatch ticket selector CLI (reads `gh issue list`
+  JSON on stdin, prints the chosen issue numbers; see [docs/agent-dispatch.md](./docs/agent-dispatch.md))
+- `npm run enrich-issue-status` - annotate the issue JSON on stdin with each
+  issue's Projects v2 board Status, for the selector's Ready-column gate
+  (fail-closed without `PROJECTS_TOKEN`; see [docs/agent-dispatch.md](./docs/agent-dispatch.md))
 - `npm run set-project-status` - best-effort Projects v2 board-sync CLI
-  (`--issue N --status "In Progress"`; no-ops without `PROJECTS_TOKEN`; see [docs/agent-loop.md](./docs/agent-loop.md))
+  (`--issue N --status "In Progress"`; no-ops without `PROJECTS_TOKEN`; see [docs/agent-dispatch.md](./docs/agent-dispatch.md))
 
 ## Project structure
 
@@ -93,8 +96,8 @@ lib/roomTypes.ts          # Shared room, seat, score, and completed-game types
 lib/usePolling.ts         # Client hook: poll the server on an interval
 lib/usePlayerId.ts        # Client hook: stable per-browser player id
 constants/game.ts         # Cross-cutting domain constants (board size, AI seat sentinel)
-scripts/agent-loop/       # Opt-in CI "issue -> PR" loop: ticket selector, label setup, board sync
-.github/workflows/        # Agent loop dispatch + Claude Code app workflows (see docs/agent-loop.md)
+scripts/agent-dispatch/       # Opt-in CI "issue -> PR" loop: ticket selector, label setup, board sync
+.github/workflows/        # Agent dispatch + Claude Code app workflows (see docs/agent-dispatch.md)
 ```
 
 See [AGENTS.md](./AGENTS.md) for contribution conventions (notably the styling
