@@ -30,3 +30,6 @@ yarn-error.log*
 next-env.d.ts
 
 .idea/
+
+# agent-loop working file
+ticket.json
