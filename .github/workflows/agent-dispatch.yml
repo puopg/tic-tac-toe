@@ -43,11 +43,14 @@ jobs:
       - uses: actions/checkout@v4
 
       # Mint a short-lived Projects v2 token from the PROJECTS_APP GitHub App
-      # (the default GITHUB_TOKEN cannot read/write user/org Projects v2). The
-      # owner-scoped installation token carries the app's organization_projects
-      # permission, which the Ready-column gate below reads through. If the app
-      # secrets are absent the step still runs but yields an empty token, so the
-      # gate simply fails closed - never blocks the job.
+      # (the default GITHUB_TOKEN cannot read/write user/org Projects v2). With no
+      # `owner`, the action resolves the app installation from this repository, so
+      # the token is repo-scoped - but it still carries the app's org-level
+      # organization_projects permission, which the Ready-column gate below reads
+      # through. (Do not set `owner`: that does a user/org installation lookup
+      # which 404s here.) If the app secrets are absent or the app is not
+      # installed on this repo the step still completes but yields an empty token,
+      # so the gate simply fails closed - never blocks the job.
       - name: Mint Projects token
         id: projects_token
         uses: actions/create-github-app-token@v1
@@ -55,7 +58,6 @@ jobs:
         with:
           app-id: ${{ secrets.PROJECTS_APP_ID }}
           private-key: ${{ secrets.PROJECTS_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
 
       - uses: actions/setup-node@v4
         with:
@@ -134,10 +136,12 @@ jobs:
           fetch-depth: 0
 
       # Mint the Projects v2 token from the PROJECTS_APP GitHub App for this job's
-      # board-sync steps (the default GITHUB_TOKEN cannot write Projects v2). The
-      # owner-scoped installation token carries organization_projects. Non-fatal:
-      # absent app secrets yield an empty token and the sync steps (already
-      # continue-on-error) just no-op.
+      # board-sync steps (the default GITHUB_TOKEN cannot write Projects v2). With
+      # no `owner`, the installation is resolved from this repository; the
+      # repo-scoped token still carries the app's org-level organization_projects
+      # permission. (Setting `owner` does a user/org installation lookup that 404s
+      # here.) Non-fatal: absent app secrets or an uninstalled app yield an empty
+      # token and the sync steps (already continue-on-error) just no-op.
       - name: Mint Projects token
         id: projects_token
         uses: actions/create-github-app-token@v1
@@ -145,7 +149,6 @@ jobs:
         with:
           app-id: ${{ secrets.PROJECTS_APP_ID }}
           private-key: ${{ secrets.PROJECTS_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
 
       - name: Claim ticket
         env:
