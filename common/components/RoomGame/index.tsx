@@ -78,6 +78,12 @@ const FALLBACK_POLL_MS = 10000;
  */
 const ACTIVE_POLL_MS = 1500;
 
+/**
+ * How long the grid-shift slide plays before the board settles. Kept in sync
+ * with $shift-slide-ms in Square/styles.module.scss, which drives the motion.
+ */
+const SHIFT_ANIMATION_MS = 280;
+
 /** Map a thrown error to a known room-error message, or the given fallback. */
 function roomErrorMessage(err: unknown, fallback: string): string {
   return ROOM_ERROR_MESSAGES[roomErrorCode(err)] ?? fallback;
@@ -93,6 +99,10 @@ const RoomGame = (props: Props) => {
   // Whether O has armed the grid shift and is now picking a direction. The
   // direction buttons live around the board perimeter only while this is on.
   const [shiftActive, setShiftActive] = useState(false);
+  // Direction of the shift currently animating on the board, or null when the
+  // board is at rest. Set briefly whenever a shift lands (locally or pushed from
+  // another client) and cleared once the slide finishes.
+  const [shiftAnimation, setShiftAnimation] = useState<Direction | null>(null);
 
   const roomKey = useMemo(
     () => ["room", props.id, playerId] as const,
@@ -306,6 +316,31 @@ const RoomGame = (props: Props) => {
     if (!canShiftNow && shiftActive) setShiftActive(false);
   }, [canShiftNow, shiftActive]);
 
+  // Animate the board whenever a shift lands. The ordered action log is the one
+  // signal that fires for every client - the shifting player, the opponent, and
+  // spectators alike - so we watch it grow and trigger the slide when the newest
+  // action is a shift. The ref seeds on first load so an already-shifted game
+  // joined mid-play doesn't replay the motion; a shrinking log (reset/rewind)
+  // just reseeds.
+  const prevActionCountRef = useRef<number | null>(null);
+  const actionCount = room?.actions.length ?? null;
+  useEffect(() => {
+    if (actionCount === null) return;
+    const prev = prevActionCountRef.current;
+    prevActionCountRef.current = actionCount;
+    if (prev === null || actionCount <= prev) return;
+    const latest = room?.actions[actionCount - 1];
+    if (latest?.kind === "shift") setShiftAnimation(latest.dir);
+  }, [actionCount, room?.actions]);
+
+  // Clear the slide once it has played so the board returns to its resting,
+  // motionless render.
+  useEffect(() => {
+    if (!shiftAnimation) return;
+    const timer = setTimeout(() => setShiftAnimation(null), SHIFT_ANIMATION_MS);
+    return () => clearTimeout(timer);
+  }, [shiftAnimation]);
+
   if (notFound) {
     return (
       <RoomNotFound
@@ -434,6 +469,7 @@ const RoomGame = (props: Props) => {
               winningLine={room.winningLine}
               onSquareClick={handleMove}
               disabled={boardDisabled}
+              shiftDirection={shiftAnimation}
             />
           </div>
         </div>
