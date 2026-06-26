@@ -33,6 +33,7 @@ yarn-error.log*
 # agent-dispatch run artifacts (generated at repo root by the CI harness)
 /ticket.json
 /execution.ndjson
+/.ticket-attachments/
 
 # typescript
 *.tsbuildinfo
