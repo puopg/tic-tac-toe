@@ -18,6 +18,7 @@ import {
 } from "@/lib/roomTypes";
 import type { Board } from "@/utils/gameLogic";
 import MiniBoard from "@/common/components/MiniBoard";
+import Spinner from "@/common/components/Spinner";
 import UIDialog from "@/common/components/UIDialog";
 import styles from "./styles.module.scss";
 
@@ -76,7 +77,11 @@ const GameCard = (props: {
 const Lobby = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: rooms, error } = useQuery<RoomSummary[]>({
+  const {
+    data: rooms,
+    error,
+    isLoading: roomsLoading,
+  } = useQuery<RoomSummary[]>({
     queryKey: ["rooms"],
     queryFn: ({ signal }) => fetchRooms(signal),
     refetchInterval: 3000,
@@ -196,6 +201,8 @@ const Lobby = () => {
         </button>
       </form>
       {formError && <p className={styles.formError}>{formError}</p>}
+
+      {roomsLoading && <Spinner label="Loading rooms…" />}
 
       {Boolean(error) && !rooms && (
         <p className={styles.loadError}>Could not load rooms. Retrying…</p>
