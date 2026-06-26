@@ -6,7 +6,7 @@ An opt-in, scheduled loop that turns Kanban tickets into reviewable pull request
 
 You open tickets on the repository's GitHub issues / Project board and mark the ones you want worked.
 Twice a day a workflow gathers the eligible tickets and lets a selector agent choose up to three to work this run - weighing priority, dependencies, and how much each one unblocks - then claims them and runs one agent per ticket.
-Each agent implements its ticket, validates with no-mistakes, and opens a pull request.
+Each agent implements its ticket and commits; the job then validates it with no-mistakes (a dedicated step) and opens a pull request.
 When you want changes on one of those PRs, you `@claude`-mention it in a comment and the Claude Code app wakes an agent to address the feedback.
 Nothing is ever merged automatically; every PR waits for you.
 
@@ -176,7 +176,7 @@ The loop is built so you can prove it before trusting the schedule:
 
 1. Run `scripts/agent-dispatch/setup-labels.sh` and make sure the `CLAUDE_CODE_OAUTH_TOKEN` secret is in place (added by the Claude Code GitHub installer).
 2. Create one disposable ticket, label it `agent:ready` + `priority:low`, and trigger `agent-dispatch` manually (Actions -> Agent issue dispatch -> Run workflow).
-3. Confirm it implements, runs no-mistakes, and opens a PR. Then `@claude`-mention that PR with a change request and confirm `claude.yml` wakes and updates it.
+3. Confirm it implements, the no-mistakes step runs, and a PR opens. Then `@claude`-mention that PR with a change request and confirm `claude.yml` wakes and updates it.
 4. Once the dry-run is clean, the twice-daily schedule is already wired; the loop runs on its own from there.
 
 ## Safety
