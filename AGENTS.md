@@ -153,6 +153,46 @@ replays the prefix of actions in order - so the action log is the single source
 of truth, and anything that changes how actions are recorded must keep
 `boardAfterActions` able to rebuild the board.
 
+## Client data fetching
+
+All client-side reads and writes go through
+[TanStack React Query](https://tanstack.com/query) (`@tanstack/react-query`), not
+a hand-rolled hook.
+A single `QueryClient` is owned by the `"use client"` root in `app/providers.tsx`
+(created once via `useState`, never per render) and provided through
+`QueryClientProvider`, which wraps `children` in the Server Component
+`app/layout.tsx`.
+Its defaults are tuned to match the old polling behaviour: `retry: false` (a
+failed fetch is retried on the next poll, not via React Query backoff) and
+`refetchOnWindowFocus: false` (polling resumes on its own interval).
+React Query's `refetchIntervalInBackground: false` default already skips polls
+while the tab is hidden.
+
+`utils/roomClient.ts` stays the thin fetch layer (unchanged signatures, still
+throwing `RoomError`/`roomErrorCode`); React Query calls into it.
+Reads use `useQuery` with `refetchInterval` for the cadence (lobby rooms 3000ms,
+completed games 5000ms, a single room 1500ms) and pass the query context `signal`
+into the `roomClient` fetcher so an in-flight GET is aborted on unmount or
+cancellation.
+Replay fetches once (`staleTime: Infinity`, no interval) because completed games
+are immutable.
+Writes use `useMutation` over the `roomClient` mutators (`createRoom`,
+`claimSeat`, `leaveSeat`, `makeMove`, `resetRoom`, `shiftRoom`).
+
+`RoomGame` is the one consumer with optimistic state and write/read contention,
+so it keeps a `paused` flag: `refetchInterval` returns `false` while a write is
+in flight, and each mutation's `onMutate` first `await`s
+`queryClient.cancelQueries` (aborting any in-flight poll) before writing to the
+cache via `queryClient.setQueryData`, so a stale GET can never clobber an
+optimistic or authoritative update.
+`makeMove` is optimistic - `onMutate` snapshots the room, writes the predicted
+board, and `onError` restores the snapshot; the authoritative response (including
+any AI reply) wins in `onSuccess`.
+Mutations key their cache writes on `["room", id, playerId]`, the same key the
+room `useQuery` reads, so optimistic updates and refetches share one cache entry.
+When adding a new client read/write, add a `useQuery`/`useMutation` here rather
+than reintroducing a bespoke polling hook.
+
 ## Styling conventions
 
 - **No Tailwind, no global utility frameworks.** Styling is done exclusively with
@@ -248,8 +288,8 @@ components.
   `utils/gameLogic.ts`).
 - `lib/` holds the remaining non-component code that is not a pure helper: the
   in-memory room and completed-game store plus all move/seat validation in
-  `lib/roomStore.ts`, shared types in `lib/roomTypes.ts`, and the client hooks
-  `usePolling`/`usePlayerId`.
+  `lib/roomStore.ts`, shared types in `lib/roomTypes.ts`, and the client hook
+  `usePlayerId`.
 - `constants/` holds cross-cutting domain constants shared across more than one
   module - e.g. `INITIAL_SIZE` (the board side length, used by `utils/gameLogic`,
   the board components, and the store) and `AI_SEAT` (the AI seat sentinel used
