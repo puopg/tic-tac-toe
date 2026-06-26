@@ -254,13 +254,20 @@ jobs:
       - name: Claim ticket
         env:
           GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -eu
           echo "Claiming #$ISSUE_NUMBER"
           gh issue edit "$ISSUE_NUMBER" \
             --add-label "agent:in-progress" --remove-label "agent:ready"
-          gh issue comment "$ISSUE_NUMBER" \
-            --body "Picked up by the agent loop. Working on it now; a PR will follow."
+          # Link the live run when we have its id; fall back to a plain line otherwise.
+          if [ -n "${RUN_ID:-}" ]; then
+            body="$(printf 'Picked up by the ollo issue agent. Working on it now.\n\n[Workflow running](%s) (run %s).' "$RUN_URL" "$RUN_ID")"
+          else
+            body="Picked up by the ollo issue agent. Working on it now."
+          fi
+          gh issue comment "$ISSUE_NUMBER" --body "$body"
 
       - name: Load ticket
         env:
