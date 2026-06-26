@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { fetchCompletedGame, RoomError } from "@/utils/roomClient";
 import {
   boardAfterActions,
@@ -21,28 +22,19 @@ type Props = {
 const AUTOPLAY_MS = 800;
 
 const Replay = (props: Props) => {
-  const [game, setGame] = useState<CompletedGameView | null>(null);
-  const [notFound, setNotFound] = useState(false);
-  const [loadError, setLoadError] = useState(false);
   // Number of moves shown so far: 0 is the empty board, moves.length is final.
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(false);
 
-  // Completed games are immutable, so fetch once instead of polling.
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchCompletedGame(props.id, controller.signal)
-      .then(setGame)
-      .catch((err: unknown) => {
-        if (controller.signal.aborted) return;
-        if (err instanceof RoomError && err.code === "game-not-found") {
-          setNotFound(true);
-        } else {
-          setLoadError(true);
-        }
-      });
-    return () => controller.abort();
-  }, [props.id]);
+  // Completed games are immutable, so fetch once and never poll or refetch.
+  const { data: game, error } = useQuery<CompletedGameView>({
+    queryKey: ["completedGame", props.id],
+    queryFn: ({ signal }) => fetchCompletedGame(props.id, signal),
+    staleTime: Infinity,
+  });
+
+  const notFound = error instanceof RoomError && error.code === "game-not-found";
+  const loadError = Boolean(error) && !notFound;
 
   const total = game ? game.actions.length : 0;
 

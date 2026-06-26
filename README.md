@@ -109,8 +109,8 @@ utils/winningLineGeometry.ts # Pure winning-line overlay geometry (cell-center p
 utils/historyLabels.ts    # Pure move-history labels: player parity + cell/shift names
 lib/roomStore.ts          # In-memory server store (Map on globalThis); all validation
 lib/roomTypes.ts          # Shared room, seat, score, and completed-game types
-lib/usePolling.ts         # Client hook: poll the server on an interval
 lib/usePlayerId.ts        # Client hook: stable per-browser player id
+app/providers.tsx         # Client root: stable React Query QueryClientProvider
 constants/game.ts         # Cross-cutting domain constants (board size, AI seat sentinel)
 scripts/agent-dispatch/       # Opt-in CI "issue -> PR" loop: ticket selector, label setup, board sync
 .github/workflows/        # deploy.yml (Vercel auto-deploy on push to main); agent-dispatch, claude, claude-code-review (see docs/agent-dispatch.md)

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.scss";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "Tic-Tac-Toe",
@@ -13,7 +14,9 @@ type Props = {
 const RootLayout = (props: Props) => {
   return (
     <html lang="en">
-      <body>{props.children}</body>
+      <body>
+        <Providers>{props.children}</Providers>
+      </body>
     </html>
   );
 };

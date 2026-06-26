@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import classNames from "classnames";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   claimSeat,
   fetchRoom,
@@ -14,7 +15,6 @@ import {
   shiftRoom,
 } from "@/utils/roomClient";
 import { usePlayerId } from "@/lib/usePlayerId";
-import { usePolling } from "@/lib/usePolling";
 import type { Direction, Player } from "@/utils/gameLogic";
 import { modeLabel, type RoomView } from "@/lib/roomTypes";
 import Board from "@/common/components/Board";
@@ -61,18 +61,28 @@ function roomErrorMessage(err: unknown, fallback: string): string {
 
 const RoomGame = (props: Props) => {
   const playerId = usePlayerId();
+  const queryClient = useQueryClient();
+  // Polling pauses while a local write is in flight so a stale GET can't clobber
+  // the optimistic/authoritative state.
   const [paused, setPaused] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const fetcher = useCallback(
-    (signal: AbortSignal) => fetchRoom(props.id, playerId, signal),
+  const roomKey = useMemo(
+    () => ["room", props.id, playerId] as const,
     [props.id, playerId],
   );
-  const {
-    data: room,
-    error,
-    setData,
-  } = usePolling<RoomView>(fetcher, 1500, paused);
+
+  const { data: room, error } = useQuery<RoomView>({
+    queryKey: roomKey,
+    queryFn: ({ signal }) => fetchRoom(props.id, playerId, signal),
+    refetchInterval: paused ? false : 1500,
+  });
+
+  // Imperatively replace the cached room (optimistic and authoritative writes).
+  const setRoom = useCallback(
+    (value: RoomView) => queryClient.setQueryData(roomKey, value),
+    [queryClient, roomKey],
+  );
 
   const notFound =
     error instanceof RoomError && error.code === "room-not-found";
@@ -83,6 +93,77 @@ const RoomGame = (props: Props) => {
     if (room.seats.O === playerId) return "O";
     return null;
   }, [room, playerId]);
+
+  // Pause polling and abort any in-flight GET before a local write begins, so a
+  // stale response can't land after our optimistic/authoritative update.
+  const beginWrite = useCallback(async () => {
+    await queryClient.cancelQueries({ queryKey: roomKey });
+    setPaused(true);
+    setActionError(null);
+  }, [queryClient, roomKey]);
+
+  const moveMutation = useMutation({
+    mutationFn: (index: number) => makeMove(props.id, playerId as string, index),
+    onMutate: async (index: number) => {
+      await beginWrite();
+      const snapshot = queryClient.getQueryData<RoomView>(roomKey);
+      if (snapshot && mySeat) {
+        const optimisticBoard = snapshot.board.slice();
+        optimisticBoard[index] = mySeat;
+        // Optimistically reflect the move; the authoritative response (incl. any
+        // AI move) wins once it arrives.
+        setRoom({
+          ...snapshot,
+          board: optimisticBoard,
+          xIsNext: !snapshot.xIsNext,
+        });
+      }
+      return { snapshot };
+    },
+    onSuccess: (updated) => setRoom(updated),
+    onError: (err, _index, context) => {
+      if (context?.snapshot) setRoom(context.snapshot);
+      setActionError(roomErrorMessage(err, "Could not make that move."));
+    },
+    onSettled: () => setPaused(false),
+  });
+
+  const claimMutation = useMutation({
+    mutationFn: (seat: Player) => claimSeat(props.id, playerId as string, seat),
+    onMutate: beginWrite,
+    onSuccess: (updated) => setRoom(updated),
+    onError: (err) =>
+      setActionError(roomErrorMessage(err, "Could not claim that seat.")),
+    onSettled: () => setPaused(false),
+  });
+
+  const leaveMutation = useMutation({
+    mutationFn: () => leaveSeat(props.id, playerId as string),
+    onMutate: beginWrite,
+    onSuccess: (updated) => setRoom(updated),
+    onError: (err) =>
+      setActionError(roomErrorMessage(err, "Could not leave the seat.")),
+    onSettled: () => setPaused(false),
+  });
+
+  const shiftMutation = useMutation({
+    mutationFn: (direction: Direction) =>
+      shiftRoom(props.id, playerId as string, direction),
+    onMutate: beginWrite,
+    onSuccess: (updated) => setRoom(updated),
+    onError: (err) =>
+      setActionError(roomErrorMessage(err, "Could not shift the grid.")),
+    onSettled: () => setPaused(false),
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: () => resetRoom(props.id, playerId as string),
+    onMutate: beginWrite,
+    onSuccess: (updated) => setRoom(updated),
+    onError: (err) =>
+      setActionError(roomErrorMessage(err, "Could not start a new game.")),
+    onSettled: () => setPaused(false),
+  });
 
   // Best-effort instant seat release: on tab close via `pagehide`, and on
   // in-app navigation (unmount) via the cleanup. The 30s TTL is the backstop.
@@ -104,7 +185,7 @@ const RoomGame = (props: Props) => {
   }, [props.id, playerId, mySeat]);
 
   const handleMove = useCallback(
-    async (index: number) => {
+    (index: number) => {
       if (!room || !playerId || !mySeat) return;
       const currentTurn: Player = room.xIsNext ? "X" : "O";
       if (
@@ -114,75 +195,30 @@ const RoomGame = (props: Props) => {
       ) {
         return;
       }
-
-      const snapshot = room;
-      const optimisticBoard = room.board.slice();
-      optimisticBoard[index] = mySeat;
-      // Optimistically reflect the move and pause polling so a stale GET can't
-      // clobber it; the authoritative response (incl. any AI move) wins.
-      setData({
-        ...room,
-        board: optimisticBoard,
-        xIsNext: !room.xIsNext,
-      });
-      setPaused(true);
-      setActionError(null);
-      try {
-        const updated = await makeMove(props.id, playerId, index);
-        setData(updated);
-      } catch (err) {
-        setData(snapshot);
-        setActionError(roomErrorMessage(err, "Could not make that move."));
-      } finally {
-        setPaused(false);
-      }
+      moveMutation.mutate(index);
     },
-    [room, playerId, mySeat, props.id, setData],
-  );
-
-  const runAction = useCallback(
-    async (action: () => Promise<RoomView>, fallbackMessage: string) => {
-      setPaused(true);
-      setActionError(null);
-      try {
-        setData(await action());
-      } catch (err) {
-        setActionError(roomErrorMessage(err, fallbackMessage));
-      } finally {
-        setPaused(false);
-      }
-    },
-    [setData],
+    [room, playerId, mySeat, moveMutation],
   );
 
   const handleClaim = useCallback(
     (seat: Player) => {
       if (!playerId) return;
-      void runAction(
-        () => claimSeat(props.id, playerId, seat),
-        "Could not claim that seat.",
-      );
+      claimMutation.mutate(seat);
     },
-    [props.id, playerId, runAction],
+    [playerId, claimMutation],
   );
 
   const handleLeave = useCallback(() => {
     if (!playerId) return;
-    void runAction(
-      () => leaveSeat(props.id, playerId),
-      "Could not leave the seat.",
-    );
-  }, [props.id, playerId, runAction]);
+    leaveMutation.mutate();
+  }, [playerId, leaveMutation]);
 
   const handleShift = useCallback(
     (direction: Direction) => {
       if (!playerId) return;
-      void runAction(
-        () => shiftRoom(props.id, playerId, direction),
-        "Could not shift the grid.",
-      );
+      shiftMutation.mutate(direction);
     },
-    [props.id, playerId, runAction],
+    [playerId, shiftMutation],
   );
 
   // Auto-reset a finished game after a short delay instead of a manual button.
@@ -203,16 +239,13 @@ const RoomGame = (props: Props) => {
 
     resetScheduledRef.current = true;
     const timer = setTimeout(() => {
-      void runAction(
-        () => resetRoom(props.id, playerId),
-        "Could not start a new game.",
-      );
+      resetMutation.mutate();
     }, AUTO_RESET_MS);
     return () => {
       clearTimeout(timer);
       resetScheduledRef.current = false;
     };
-  }, [room?.status, room?.seats.X, mySeat, playerId, props.id, runAction]);
+  }, [room?.status, room?.seats.X, mySeat, playerId, resetMutation]);
 
   if (notFound) {
     return (

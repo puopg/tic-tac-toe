@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IoHelpCircleOutline } from "react-icons/io5";
 import {
   createRoom,
@@ -9,7 +10,6 @@ import {
   fetchRooms,
   roomErrorCode,
 } from "@/utils/roomClient";
-import { usePolling } from "@/lib/usePolling";
 import {
   modeLabel,
   type CompletedGameSummary,
@@ -45,18 +45,29 @@ const PAGE_SIZE = 6;
 
 const Lobby = () => {
   const router = useRouter();
-  const { data: rooms, error } = usePolling<RoomSummary[]>(
-    (signal) => fetchRooms(signal),
-    3000,
-  );
-  const { data: completed } = usePolling<CompletedGameSummary[]>(
-    (signal) => fetchCompletedGames(signal),
-    5000,
-  );
+  const queryClient = useQueryClient();
+  const { data: rooms, error } = useQuery<RoomSummary[]>({
+    queryKey: ["rooms"],
+    queryFn: ({ signal }) => fetchRooms(signal),
+    refetchInterval: 3000,
+  });
+  const { data: completed } = useQuery<CompletedGameSummary[]>({
+    queryKey: ["completed"],
+    queryFn: ({ signal }) => fetchCompletedGames(signal),
+    refetchInterval: 5000,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (vars: { name: string; mode: RoomMode }) =>
+      createRoom(vars.name, vars.mode),
+    onSuccess: (room) => {
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
+      router.push(`/room/${room.id}`);
+    },
+  });
 
   const [name, setName] = useState("");
   const [mode, setMode] = useState<RoomMode>("two-player");
-  const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [howToOpen, setHowToOpen] = useState(false);
@@ -77,17 +88,15 @@ const Lobby = () => {
   const handleCreate = useCallback(
     async (event: React.FormEvent) => {
       event.preventDefault();
-      if (creating) return;
+      if (createMutation.isPending) return;
       const trimmed = name.trim();
       if (!trimmed) {
         setFormError("Please enter a room name.");
         return;
       }
-      setCreating(true);
       setFormError(null);
       try {
-        const room = await createRoom(trimmed, mode);
-        router.push(`/room/${room.id}`);
+        await createMutation.mutateAsync({ name: trimmed, mode });
       } catch (err) {
         const code = roomErrorCode(err);
         setFormError(
@@ -95,10 +104,9 @@ const Lobby = () => {
             ? "That room name is not valid."
             : "Could not create the room. Please try again.",
         );
-        setCreating(false);
       }
     },
-    [creating, name, mode, router],
+    [createMutation, name, mode],
   );
 
   return (
@@ -149,8 +157,12 @@ const Lobby = () => {
             vs AI
           </button>
         </div>
-        <button type="submit" className={styles.createButton} disabled={creating}>
-          {creating ? "Creating…" : "New room"}
+        <button
+          type="submit"
+          className={styles.createButton}
+          disabled={createMutation.isPending}
+        >
+          {createMutation.isPending ? "Creating…" : "New room"}
         </button>
       </form>
       {formError && <p className={styles.formError}>{formError}</p>}
