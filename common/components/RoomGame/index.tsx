@@ -330,7 +330,11 @@ const RoomGame = (props: Props) => {
         )}
       </div>
 
-      <div className={styles.playArea}>
+      <div
+        className={classNames(styles.playArea, {
+          [styles.playAreaWithHistory]: room.actions.length > 0,
+        })}
+      >
         <BoardHistory actions={room.actions} />
 
         <div className={styles.boardArea}>
