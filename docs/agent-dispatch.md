@@ -6,7 +6,7 @@ An opt-in, scheduled loop that turns Kanban tickets into reviewable pull request
 
 You open tickets on the repository's GitHub issues / Project board and mark the ones you want worked.
 Twice a day a workflow gathers the eligible tickets and lets a selector agent choose up to three to work this run - weighing priority, dependencies, and how much each one unblocks - then claims them and runs one agent per ticket.
-Each agent implements its ticket, validates with no-mistakes, and opens a pull request.
+Each agent implements its ticket and commits; the job then validates it with no-mistakes (a dedicated step) and opens a pull request.
 When you want changes on one of those PRs, you `@claude`-mention it in a comment and the Claude Code app wakes an agent to address the feedback.
 Nothing is ever merged automatically; every PR waits for you.
 
@@ -34,7 +34,7 @@ Label the handful of tickets you are happy to automate, and they still stay put 
 Anything without `agent:ready` is invisible regardless of column, so you can file freely:
 
 - **Backfilling resolved issues** - file them closed, or open without `agent:ready`; closed tickets are never pulled.
-- **Tracking / non-deliverable tickets** - leave `agent:ready` off (optionally add `type:tracking`); they live on the board but the agent ignores them.
+- **Tracking / non-deliverable tickets** - leave `agent:ready` off; they live on the board but the agent ignores them.
 
 To hand a ticket to the agent, add `agent:ready` plus a `priority:*` label **and** move its card into the Ready column.
 
@@ -112,8 +112,9 @@ That is the claim lock: a later run will not re-pull a ticket that is already in
 Keeping the claim per-ticket makes each ticket's lifecycle self-contained - one ticket failing to claim or run can never strand another.
 
 The same per-ticket job ends with a done/park step that always runs.
-If the job finishes with an open PR for `fm/issue-<number>`, the ticket is moved to `agent:done` (dropping `agent:in-progress`) and waits for you to review and merge.
-If it finishes without an open PR - a failed run, a risky finding the agent stopped on, or no change needed - the ticket is moved to `agent:needs-help` and a comment is left, so it parks for you instead of being stranded in `agent:in-progress`.
+If the job finishes with an open PR for the ticket's branch (`agent/issue-<number>/<slug>-<hash>`, the slug derived from the issue title and the 5-char hash derived from the run id + attempt so a re-run never reuses a prior run's branch), the ticket is moved to `agent:done` (dropping `agent:in-progress`) and waits for you to review and merge.
+If no-mistakes does not reach a shipping outcome but the agent left commits on the branch, a fallback step opens a PR anyway - pushing the branch and drafting the body with Claude - under a `[!WARNING]` banner that flags it skipped validation; that PR still lands the ticket in `agent:done`, so review it carefully.
+If it finishes without any open PR - a failed run with no commits, a risky finding the agent stopped on, or no change needed - the ticket is moved to `agent:needs-help` and a comment is left, so it parks for you instead of being stranded in `agent:in-progress`.
 The park comment is not a fixed string: it diagnoses what actually happened, quoting the agent's own final message (its reason for stopping) on a run that finished, or a "failed or timed out" message otherwise, and always links back to the run.
 
 ## Run transcript and parking diagnostics
@@ -154,7 +155,7 @@ The board's Status field is used in two directions, both via a `PROJECTS_TOKEN` 
 To enable both:
 
 1. **Secrets.** Register a GitHub App with **Projects** read+write (organization) permission, install it on this repository, and add its credentials as two repository secrets: `PROJECTS_APP_ID` and `PROJECTS_APP_PRIVATE_KEY`. Each job mints a short-lived installation token from them (via `actions/create-github-app-token`, resolved from this repo - no `owner`, which would do a user/org lookup that 404s) and passes it to the scripts as `PROJECTS_TOKEN`. The repo-scoped token still carries the app's org-level Projects permission. A GitHub App is used rather than a PAT because the default `GITHUB_TOKEN` cannot read or write user/org Projects v2, and an App token is short-lived and not tied to a single user.
-2. **Status options.** On the project, the **Status** field must offer a `Ready` option (the selection gate) plus `In Progress`, `In Review`, and `Needs captain` (board sync), all matched case-insensitively.
+2. **Status options.** On the project, the **Status** field must offer a `Ready` option (the selection gate) plus `In Progress` and `In Review` (board sync), all matched case-insensitively.
    `Backlog` (or any other non-`Ready` column) needs no special option - it is simply "not Ready" to the gate.
    `Done` is **not** required here: the merge -> `Done` transition is handled natively by GitHub Projects' built-in "pull request merged / item closed -> Done" workflow, and tickets close via `Closes #<n>` in the PR body.
 
@@ -162,7 +163,7 @@ Once set up, the workflows move the card automatically:
 
 - **Claimed** -> `In Progress` (dispatch, right after `agent:in-progress` is added).
 - **PR opened** -> `In Review` (dispatch, alongside the `agent:done` label when an open PR exists for the branch).
-- **Parked** -> `Needs captain` (dispatch, alongside the `agent:needs-help` label when no PR was opened).
+- **Parked** -> no column change; the card stays in its current column and the `agent:needs-help` label flags it (dispatch, when no PR was opened).
 
 `@claude` follow-ups on an existing PR (via the installer's `claude.yml`) do not move the card; the PR is already in `In Review` and stays there until you merge it.
 
@@ -176,12 +177,12 @@ The loop is built so you can prove it before trusting the schedule:
 
 1. Run `scripts/agent-dispatch/setup-labels.sh` and make sure the `CLAUDE_CODE_OAUTH_TOKEN` secret is in place (added by the Claude Code GitHub installer).
 2. Create one disposable ticket, label it `agent:ready` + `priority:low`, and trigger `agent-dispatch` manually (Actions -> Agent issue dispatch -> Run workflow).
-3. Confirm it implements, runs no-mistakes, and opens a PR. Then `@claude`-mention that PR with a change request and confirm `claude.yml` wakes and updates it.
+3. Confirm it implements, the no-mistakes step runs, and a PR opens. Then `@claude`-mention that PR with a change request and confirm `claude.yml` wakes and updates it.
 4. Once the dry-run is clean, the twice-daily schedule is already wired; the loop runs on its own from there.
 
 ## Safety
 
-- Nothing merges automatically - the captain merges every PR.
+- Nothing merges automatically - a maintainer merges every PR.
 - PR follow-ups only fire on an explicit `@claude` mention (the installer's `claude.yml`), so the agent acts when you ask it to rather than on every comment.
 - Event data (the dispatch `max` input, PR numbers) is never interpolated into a shell `run:` line; it is passed through `env:` and referenced as a quoted variable, which avoids GitHub Actions script injection.
 - no-mistakes runs in full; routine findings are auto-approved, and genuinely risky or irreversible ones stop the run cleanly. Any run that ends without an open PR - a clean risky stop or an outright failure - parks the ticket to `agent:needs-help` rather than leaving it stuck in `agent:in-progress`.
