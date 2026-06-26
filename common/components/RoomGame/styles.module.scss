@@ -7,29 +7,23 @@
 
 .seatBar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: stretch;
   gap: 10px;
-  padding: 10px 12px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-}
-
-.youBadge {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--text);
+  width: 100%;
 }
 
 .spectateBadge {
+  flex: 1;
+  padding: 10px 14px;
   font-size: 0.9rem;
   font-weight: 700;
   color: var(--text-muted);
+  text-align: center;
 }
 
 .seatButton {
-  padding: 8px 14px;
+  flex: 1;
+  padding: 10px 14px;
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--text);
@@ -48,6 +42,20 @@
   &:disabled {
     opacity: 0.55;
     cursor: default;
+  }
+}
+
+// Seated state: a single full-width call-to-action. A soft, translucent
+// accent tint (vs the muted `--surface` of the seat-claim buttons) marks
+// leaving as the primary action without the harshness of a solid fill.
+.leaveButton {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    border-color: var(--accent);
   }
 }
 
