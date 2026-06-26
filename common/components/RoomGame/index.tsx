@@ -111,7 +111,8 @@ const RoomGame = (props: Props) => {
   // suspended entirely during a local write.
   const { data: room, error } = useQuery<RoomView>({
     queryKey: roomKey,
-    queryFn: ({ signal }) => fetchRoom(props.id, playerId, signal),
+    queryFn: ({ signal }) =>
+      fetchRoom(props.id, streamConnected ? undefined : playerId, signal),
     refetchInterval: paused
       ? false
       : streamConnected

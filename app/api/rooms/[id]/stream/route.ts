@@ -46,6 +46,8 @@ export async function GET(
       let lastPayload: string | null = null;
       let pollTimer: ReturnType<typeof setTimeout> | undefined;
       let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+      let consecutiveFailures = 0;
+      const MAX_CONSECUTIVE_FAILURES = 3;
 
       const close = () => {
         if (closed) return;
@@ -82,7 +84,11 @@ export async function GET(
             return;
           }
           view = toView(room);
+          consecutiveFailures = 0;
         } catch {
+          if (++consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+            close();
+          }
           return;
         }
         const { seatSeen: _seatSeen, ...rest } = view;
