@@ -273,13 +273,11 @@ const RoomGame = (props: Props) => {
       ? (room.board[room.winningLine[0]] as Player)
       : null;
   const bothSeated = room.seats.X !== null && room.seats.O !== null;
-  // O's shift is an alternative to placing on O's own turn, once per game.
+  // O's shift is an alternative to placing on O's own turn, once per game. Like
+  // a normal placement it only needs O to be seated and on turn - not both seats
+  // filled - so a single player swapping into O can still use it.
   const canShiftNow =
-    mySeat === "O" &&
-    !gameOver &&
-    bothSeated &&
-    currentTurn === "O" &&
-    !room.oShiftUsed;
+    mySeat === "O" && !gameOver && currentTurn === "O" && !room.oShiftUsed;
 
   const xLabel = mySeat === "X" ? "You (X)" : "Player X";
   const oLabel =
@@ -287,22 +285,23 @@ const RoomGame = (props: Props) => {
 
   // Terminal and pure spectator states share their wording with the replay
   // viewer (spectatorStatus); only the seat-aware mid-game lines are bespoke.
+  // "Your turn" is checked before the empty-seat case so a solo player who is on
+  // turn (e.g. O after swapping seats) is prompted to act rather than told to
+  // wait - mirroring canShiftNow, which also drops the bothSeated requirement.
   let status: StatusInfo;
-  if (!gameOver && !bothSeated) {
+  if (!gameOver && mySeat && currentTurn === mySeat) {
+    status = { message: "Your turn", tone: playerTone(currentTurn) };
+  } else if (!gameOver && !bothSeated) {
     status = { message: "Waiting for opponent", tone: "neutral" };
   } else if (!gameOver && mySeat) {
-    status = {
-      message: currentTurn === mySeat ? "Your turn" : "Opponent's turn",
-      tone: playerTone(currentTurn),
-    };
+    status = { message: "Opponent's turn", tone: playerTone(currentTurn) };
   } else {
     status = spectatorStatus(winner, currentTurn, gameOver);
   }
 
   const boardDisabled =
     gameOver || mySeat === null || currentTurn !== mySeat || paused;
-  const turnActive = (seat: Player) =>
-    !gameOver && bothSeated && currentTurn === seat;
+  const turnActive = (seat: Player) => !gameOver && currentTurn === seat;
 
   return (
     <div className={styles.root}>
