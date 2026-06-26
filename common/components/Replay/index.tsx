@@ -9,8 +9,9 @@ import {
   calculateWinner,
   type Player,
 } from "@/utils/gameLogic";
-import { modeLabel, type CompletedGameView } from "@/lib/roomTypes";
+import { type CompletedGameView } from "@/lib/roomTypes";
 import Board from "@/common/components/Board";
+import RoomHeader from "@/common/components/RoomHeader";
 import Status, { type StatusTone, playerTone } from "@/common/components/Status";
 import styles from "./styles.module.scss";
 
@@ -108,13 +109,7 @@ const Replay = (props: Props) => {
 
   return (
     <div className={styles.root}>
-      <header className={styles.topBar}>
-        <Link href="/" className={styles.back}>
-          ← Lobby
-        </Link>
-        <h1 className={styles.title}>{game.name}</h1>
-        <span className={styles.modeTag}>{modeLabel(game.mode)}</span>
-      </header>
+      <RoomHeader name={game.name} mode={game.mode} />
 
       <p className={styles.replayTag}>Replay · read-only</p>
 

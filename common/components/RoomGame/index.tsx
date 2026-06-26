@@ -16,9 +16,10 @@ import {
 } from "@/utils/roomClient";
 import { usePlayerId } from "@/lib/usePlayerId";
 import type { Direction, Player } from "@/utils/gameLogic";
-import { modeLabel, type RoomView } from "@/lib/roomTypes";
+import type { RoomView } from "@/lib/roomTypes";
 import Board from "@/common/components/Board";
 import BoardHistory from "@/common/components/BoardHistory";
+import RoomHeader from "@/common/components/RoomHeader";
 import Status, {
   type StatusTone,
   playerTone,
@@ -313,13 +314,7 @@ const RoomGame = (props: Props) => {
 
   return (
     <div className={styles.root}>
-      <header className={styles.topBar}>
-        <Link href="/" className={styles.back}>
-          ← Lobby
-        </Link>
-        <h1 className={styles.title}>{room.name}</h1>
-        <span className={styles.modeTag}>{modeLabel(room.mode)}</span>
-      </header>
+      <RoomHeader name={room.name} mode={room.mode} />
 
       <Status message={statusMessage} tone={statusTone} />
 
