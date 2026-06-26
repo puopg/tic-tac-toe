@@ -52,7 +52,7 @@ jobs:
             exit 0
           fi
           # The deploy script is `vercel --prod`; provide the Vercel CLI on PATH
-          # and let `yarn deploy` invoke it. --token/--yes keep it non-interactive
-          # in CI (the CLI also reads VERCEL_ORG_ID / VERCEL_PROJECT_ID from env).
-          npm i -g vercel
-          yarn deploy --token="$VERCEL_TOKEN" --yes
+          # and let `yarn deploy` invoke it. --yes keeps it non-interactive in CI;
+          # the CLI reads VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID from env.
+          npm i -g vercel@44
+          yarn deploy --yes
