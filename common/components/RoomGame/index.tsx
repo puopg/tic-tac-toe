@@ -91,7 +91,8 @@ const RoomGame = (props: Props) => {
   const [paused, setPaused] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   // Whether O has armed the grid shift and is now picking a direction. The
-  // direction buttons live around the board perimeter only while this is on.
+  // direction buttons are mounted whenever O can shift but hidden (opacity: 0)
+  // at rest so cancelling can reverse the fade-in before the board grows back.
   const [shiftActive, setShiftActive] = useState(false);
 
   const roomKey = useMemo(
