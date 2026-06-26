@@ -577,11 +577,13 @@ jobs:
       # Validate and ship the agent's committed work through no-mistakes - as its
       # own plain shell step, NOT from inside the agent's turn. This is the core of
       # the split: a full no-mistakes run (review -> test -> lint -> docs -> push ->
-      # PR -> CI watch) routinely exceeds 10 minutes, and the agent's Bash tool has
-      # a hard 10-minute cap that auto-backgrounds any longer call - which, in
-      # headless `claude -p`, silently kills the pipeline the moment the agent's
-      # turn ends (the #58 / #59 parks). Run as a normal `run:` step, the only
-      # bound is the job's timeout-minutes, so the pipeline blocks to completion.
+      # PR) routinely exceeds 10 minutes, and the agent's Bash tool has a hard
+      # 10-minute cap that auto-backgrounds any longer call - which, in headless
+      # `claude -p`, silently kills the pipeline the moment the agent's turn ends
+      # (the #58 / #59 parks). Run as a normal `run:` step, the only bound is the
+      # job's timeout-minutes, so the pipeline blocks to completion. The CI-watch
+      # step is skipped (--skip ci below): the loop ships a reviewable PR and lets
+      # its checks run independently rather than holding a runner idle on them.
       #
       # The no-mistakes daemon was primed earlier with the App token (push, incl.
       # .github/workflows/*) and the OAuth token (its review-step claude). `axi run
@@ -613,7 +615,15 @@ jobs:
           # intermediate decision point, and is bounded so it can never spin forever.
           # Only stdout (the TOON result) is captured; the pipeline's stderr progress
           # streams straight to the job log for visibility.
-          out="$(no-mistakes axi run --yes --intent "$intent")" || true
+          #
+          # --skip ci: do NOT block on the CI step. By default no-mistakes' CI step
+          # watches the opened PR until checks go green (several minutes of pure
+          # waiting on a runner). The dispatch loop's job is to land a reviewable PR,
+          # not to gate on GitHub Actions - the PR's own checks run independently and
+          # a human reviews them before merge - so skipping CI returns the moment the
+          # PR is open. The run still resolves to a shipping outcome
+          # (checks-passed/passed); review/test/lint/docs all still run.
+          out="$(no-mistakes axi run --yes --skip ci --intent "$intent")" || true
           printf '%s\n' "$out"
           i=0
           while ! printf '%s\n' "$out" | grep -qE '^outcome:'; do
