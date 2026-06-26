@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import classNames from "classnames";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -20,6 +19,7 @@ import type { RoomView } from "@/lib/roomTypes";
 import Board from "@/common/components/Board";
 import BoardHistory from "@/common/components/BoardHistory";
 import RoomHeader from "@/common/components/RoomHeader";
+import RoomNotFound, { RoomLoading } from "@/common/components/RoomMessage";
 import Status, {
   type StatusInfo,
   playerTone,
@@ -120,7 +120,8 @@ const RoomGame = (props: Props) => {
   );
 
   const moveMutation = useMutation({
-    mutationFn: (index: number) => makeMove(props.id, playerId as string, index),
+    mutationFn: (index: number) =>
+      makeMove(props.id, playerId as string, index),
     onMutate: async (index: number) => {
       await beginWrite();
       const snapshot = queryClient.getQueryData<RoomView>(roomKey);
@@ -250,23 +251,18 @@ const RoomGame = (props: Props) => {
 
   if (notFound) {
     return (
-      <div className={styles.notFound}>
-        <p className={styles.notFoundTitle}>Room no longer exists</p>
-        <p className={styles.notFoundHint}>
-          It may have been removed or the server restarted.
-        </p>
-        <Link href="/" className={styles.backLink}>
-          Back to lobby
-        </Link>
-      </div>
+      <RoomNotFound
+        title="Room no longer exists"
+        hint="It may have been removed or the server restarted."
+      />
     );
   }
 
   if (!room) {
     return (
-      <div className={styles.loading}>
+      <RoomLoading>
         {error ? "Could not load the room. Retrying…" : "Loading room…"}
-      </div>
+      </RoomLoading>
     );
   }
 
