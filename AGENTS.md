@@ -134,7 +134,8 @@ player O's own screen, when it is O's turn and the shift is unused (`canShiftNow
 the O panel also renders the `SHIFT_OPTIONS` direction buttons so O activates the
 shift directly from the indicator - X and spectators see the status but no
 controls. `canShiftNow` mirrors the store's `shiftBoardAction` guard
-(`mySeat === "O"`, O's turn, both seated, shift unused). There is no manual "New
+(`mySeat === "O"`, O's turn, shift unused) — no `bothSeated` requirement, so a
+solo player who swaps into the O seat can still trigger the shift. There is no manual "New
 Game" button: a finished game auto-resets after `AUTO_RESET_MS` via a single
 seated scheduler (the X seat, falling back to O if X is empty) guarded by a ref so
 the many polling clients/spectators do not double-reset, with a "Next game
