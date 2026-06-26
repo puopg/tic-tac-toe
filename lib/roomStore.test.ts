@@ -211,8 +211,10 @@ describe("scoring and completed-game archival on settle", () => {
     const room = await getRoom(id);
     expect(room?.scores).toEqual({ X: 1, O: 0, draws: 0 });
 
-    // The finished game is archived exactly once, with X as the winner.
-    const completed = await listCompletedGames();
+    // The finished game is archived exactly once, with X as the winner, and is
+    // listed to each of its two players.
+    expect(await listCompletedGames(PX)).toHaveLength(1);
+    const completed = await listCompletedGames(PO);
     expect(completed).toHaveLength(1);
     expect(completed[0]?.winner).toBe("X");
 
@@ -221,6 +223,23 @@ describe("scoring and completed-game archival on settle", () => {
       ok: false,
       error: "game-over",
     });
+  });
+
+  it("lists a completed game only to the players who took part in it", async () => {
+    const { id } = await seatedRoom();
+
+    // X wins the top row; the game is archived with PX and PO as participants.
+    expect((await makeMove(id, 0, PX)).ok).toBe(true);
+    expect((await makeMove(id, 3, PO)).ok).toBe(true);
+    expect((await makeMove(id, 1, PX)).ok).toBe(true);
+    expect((await makeMove(id, 5, PO)).ok).toBe(true);
+    expect((await makeMove(id, 2, PX)).ok).toBe(true); // X wins
+
+    // Both participants see it; an unrelated player and an empty id see nothing.
+    expect(await listCompletedGames(PX)).toHaveLength(1);
+    expect(await listCompletedGames(PO)).toHaveLength(1);
+    expect(await listCompletedGames("stranger")).toHaveLength(0);
+    expect(await listCompletedGames("")).toHaveLength(0);
   });
 
   it("resetGame clears the board for a participant", async () => {

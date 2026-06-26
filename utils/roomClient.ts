@@ -148,9 +148,15 @@ export function shiftRoom(
 }
 
 export function fetchCompletedGames(
+  playerId: string,
   signal?: AbortSignal,
 ): Promise<CompletedGameSummary[]> {
-  return getJson<CompletedGameSummary[]>("/api/completed", "games", signal);
+  const query = `?playerId=${encodeURIComponent(playerId)}`;
+  return getJson<CompletedGameSummary[]>(
+    `/api/completed${query}`,
+    "games",
+    signal,
+  );
 }
 
 export function fetchCompletedGame(

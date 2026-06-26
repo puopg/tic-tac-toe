@@ -123,6 +123,8 @@ function rowToCompleted(row: CompletedRow): CompletedGame {
     name: row.name,
     mode: row.mode as RoomMode,
     actions: row.actions as CompletedGame["actions"],
+    playerX: row.playerX,
+    playerO: row.playerO,
     completedAt: row.completedAt.getTime(),
   };
 }
@@ -134,6 +136,8 @@ function completedToData(game: CompletedGame) {
     name: game.name,
     mode: game.mode,
     actions: asJson(game.actions),
+    playerX: game.playerX,
+    playerO: game.playerO,
     completedAt: new Date(game.completedAt),
   };
 }
@@ -185,6 +189,9 @@ function archiveCompletedGame(room: Room, archive: Archive): void {
     name: room.name,
     mode: room.mode,
     actions: room.actions.slice(),
+    // Capture the seat holders so the game is only ever listed to its players.
+    playerX: room.seats.X,
+    playerO: room.seats.O,
     completedAt: now(),
   });
 }
@@ -408,10 +415,18 @@ export function toCompletedView(game: CompletedGame): CompletedGameView {
   };
 }
 
-/** Archived finished games, newest first. */
-export async function listCompletedGames(): Promise<CompletedGameSummary[]> {
+/**
+ * Archived finished games the given player took part in, newest first. Scoped to
+ * a player so each browser only sees its own games; a request without a player id
+ * (or for a player who has finished nothing) gets an empty list.
+ */
+export async function listCompletedGames(
+  playerId: string,
+): Promise<CompletedGameSummary[]> {
+  if (!playerId) return [];
   await reapIdleCompleted();
   const rows = await prisma.completedGame.findMany({
+    where: { OR: [{ playerX: playerId }, { playerO: playerId }] },
     orderBy: { completedAt: "desc" },
   });
   return rows.map((row) => toCompletedSummary(rowToCompleted(row)));
