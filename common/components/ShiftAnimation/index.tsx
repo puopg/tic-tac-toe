@@ -4,27 +4,56 @@ import { useEffect, useState } from "react";
 import classNames from "classnames";
 import { IoArrowForward } from "react-icons/io5";
 import { INITIAL_SIZE } from "@/constants/game";
+import { DEFAULT_SHIFT_MODE, type ShiftMode } from "@/utils/gameLogic";
 import styles from "./styles.module.scss";
 
-type Mark = {
+type SceneMark = {
   id: string;
   player: "X" | "O";
   row: number;
   col: number;
+  // Where the mark ends up after the shift fires: a destination column, or how
+  // it leaves the board - "fall" (classic: pushed off the leading edge) or
+  // "captured" (collapse: an X ploughed over this O in its path).
+  to: number | "fall" | "captured";
 };
 
-// A small, fixed scene that illustrates O's grid shift to the right: every mark
-// slides one cell over and the marks pushed off the leading (right) edge fall
-// away. Kept as a static example rather than driven through `shiftBoard` so the
-// picture stays legible - it always shows both a surviving mark and marks that
-// fall off.
-const MARKS: readonly Mark[] = [
-  { id: "x-tl", player: "X", row: 0, col: 0 },
-  { id: "o-tr", player: "O", row: 0, col: 2 },
-  { id: "x-mid", player: "X", row: 1, col: 1 },
-  { id: "o-bl", player: "O", row: 2, col: 0 },
-  { id: "x-br", player: "X", row: 2, col: 2 },
-];
+type Scene = {
+  marks: readonly SceneMark[];
+  caption: string;
+};
+
+// A small, fixed scene that illustrates O's grid shift to the right. Both scenes
+// are hand-authored rather than driven through `shiftBoard` so the picture stays
+// legible - each always shows the behaviour that defines its mode.
+const SCENES: Record<ShiftMode, Scene> = {
+  // Classic: every mark slides exactly one cell over; marks pushed off the
+  // leading (right) edge fall away.
+  classic: {
+    caption: "O shifts the grid one cell right",
+    marks: [
+      { id: "x-tl", player: "X", row: 0, col: 0, to: 1 },
+      { id: "o-tr", player: "O", row: 0, col: 2, to: "fall" },
+      { id: "x-mid", player: "X", row: 1, col: 1, to: 2 },
+      { id: "o-bl", player: "O", row: 2, col: 0, to: 1 },
+      { id: "x-br", player: "X", row: 2, col: 2, to: "fall" },
+    ],
+  },
+  // Collapse: every mark slides as far right as it can and stacks against the
+  // edge. Row 0 shows an X ploughing through (and removing) the O ahead of it;
+  // row 1 shows an O blocked by an X; row 2 shows same-kind marks stacking.
+  collapse: {
+    caption: "O collapses the grid to the right",
+    marks: [
+      { id: "c-x-plough", player: "X", row: 0, col: 0, to: 2 },
+      { id: "c-o-eaten", player: "O", row: 0, col: 2, to: "captured" },
+      { id: "c-o-blocked", player: "O", row: 1, col: 0, to: 1 },
+      { id: "c-x-block", player: "X", row: 1, col: 1, to: 2 },
+      { id: "c-o-stack-a", player: "O", row: 2, col: 0, to: 1 },
+      { id: "c-o-stack-b", player: "O", row: 2, col: 1, to: 2 },
+    ],
+  },
+};
 
 // One loop: the arrow sweeps, the grid shifts, then the result is held before
 // the scene resets. Kept colocated with the component as UI-only timings.
@@ -35,15 +64,19 @@ const HOLD_MS = 1100;
 /**
  * Looping, decorative illustration of player O's grid shift, shown at the bottom
  * of the "How to play" dialog. A directional arrow fades in and drifts, then the
- * marks slide one cell and the ones pushed off the edge fall away. Honours
- * `prefers-reduced-motion` by holding the starting board still.
+ * marks resolve the shift for the active {@link ShiftMode}: in "classic" each
+ * mark slides one cell (edge marks fall away), while in "collapse" marks slide
+ * all the way to the edge, X ploughs through O, and same-kind marks stack.
+ * Honours `prefers-reduced-motion` by holding the starting board still.
  */
-const ShiftAnimation = () => {
+const ShiftAnimation = ({ mode = DEFAULT_SHIFT_MODE }: { mode?: ShiftMode }) => {
   const [reducedMotion, setReducedMotion] = useState(false);
   const [shifted, setShifted] = useState(false);
   // Bumped each loop and used as a remount key so the scene resets to its start
   // state without playing every transition in reverse.
   const [cycle, setCycle] = useState(0);
+
+  const scene = SCENES[mode] ?? SCENES[DEFAULT_SHIFT_MODE];
 
   useEffect(() => {
     const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -76,18 +109,25 @@ const ShiftAnimation = () => {
         </div>
 
         <div key={`marks-${cycle}`} className={styles.marks}>
-          {MARKS.map((mark) => {
-            const fallsOff = mark.col + 1 >= INITIAL_SIZE;
+          {scene.marks.map((mark) => {
+            const cells = typeof mark.to === "number" ? mark.to - mark.col : 0;
             return (
               <div
                 key={mark.id}
                 className={classNames(styles.mark, {
                   [styles.x]: mark.player === "X",
                   [styles.o]: mark.player === "O",
-                  [styles.shifted]: shifted && !fallsOff,
-                  [styles.fallOff]: shifted && fallsOff,
+                  [styles.shifted]: shifted && typeof mark.to === "number",
+                  [styles.fallOff]: shifted && mark.to === "fall",
+                  [styles.captured]: shifted && mark.to === "captured",
                 })}
-                style={{ gridColumn: mark.col + 1, gridRow: mark.row + 1 }}
+                style={
+                  {
+                    gridColumn: mark.col + 1,
+                    gridRow: mark.row + 1,
+                    "--shift-cells": cells,
+                  } as React.CSSProperties
+                }
               >
                 {mark.player}
               </div>
@@ -101,7 +141,7 @@ const ShiftAnimation = () => {
           </div>
         )}
       </div>
-      <span className={styles.caption}>O shifts the grid right</span>
+      <span className={styles.caption}>{scene.caption}</span>
     </div>
   );
 };
