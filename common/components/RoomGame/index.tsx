@@ -540,7 +540,10 @@ const RoomGame = (props: Props) => {
           <div className={styles.countdownTrack} aria-hidden="true">
             <div
               className={styles.countdownBar}
-              style={{ animationDuration: `${AUTO_RESET_MS}ms` }}
+              style={{
+                animationDuration: `${AUTO_RESET_MS}ms`,
+                animationDelay: `${-Math.min(Date.now() - room.lastActivity, AUTO_RESET_MS)}ms`,
+              }}
             />
           </div>
         </div>
