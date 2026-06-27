@@ -53,8 +53,15 @@ model CompletedGame {
   mode        String
   /// Every action in play order; X takes even indices, O odd.
   actions     Json
+  /// Seat holders at archive time, so a game can be shown only to its players.
+  /// O is the AI sentinel in AI rooms; both are null for games archived before
+  /// this was recorded (they belong to no player and stay hidden).
+  playerX     String?  @map("player_x")
+  playerO     String?  @map("player_o")
   completedAt DateTime @default(now()) @map("completed_at") @db.Timestamptz
 
   @@index([completedAt])
+  @@index([playerX])
+  @@index([playerO])
   @@map("completed_games")
 }

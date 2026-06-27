@@ -17,6 +17,7 @@ import {
   type RoomSummary,
 } from "@/lib/roomTypes";
 import type { Board } from "@/utils/gameLogic";
+import { usePlayerId } from "@/lib/usePlayerId";
 import MiniBoard from "@/common/components/MiniBoard";
 import ShiftAnimation from "@/common/components/ShiftAnimation";
 import Spinner from "@/common/components/Spinner";
@@ -78,6 +79,7 @@ const GameCard = (props: {
 const Lobby = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const playerId = usePlayerId();
   const {
     data: rooms,
     error,
@@ -87,9 +89,11 @@ const Lobby = () => {
     queryFn: ({ signal }) => fetchRooms(signal),
     refetchInterval: 3000,
   });
+  // Only the games this browser took part in; gated on the player id being ready.
   const { data: completed } = useQuery<CompletedGameSummary[]>({
-    queryKey: ["completed"],
-    queryFn: ({ signal }) => fetchCompletedGames(signal),
+    queryKey: ["completed", playerId],
+    queryFn: ({ signal }) => fetchCompletedGames(playerId as string, signal),
+    enabled: Boolean(playerId),
     refetchInterval: 5000,
   });
 
@@ -269,10 +273,10 @@ const Lobby = () => {
 
       {completed && completed.length > 0 && (
         <section className={styles.completedSection}>
-          <h2 className={styles.sectionTitle}>Completed games</h2>
+          <h2 className={styles.sectionTitle}>Your completed games</h2>
           <p className={styles.sectionHint}>
-            Finished games can no longer be played, but you can replay them turn
-            by turn.
+            Games you have finished can no longer be played, but you can replay
+            them turn by turn.
           </p>
           <ul className={styles.roomList}>
             {completed.map((game) => (

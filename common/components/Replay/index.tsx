@@ -12,6 +12,7 @@ import {
 } from "@/utils/gameLogic";
 import { actionSentence } from "@/utils/historyLabels";
 import { type CompletedGameView } from "@/lib/roomTypes";
+import { usePlayerId } from "@/lib/usePlayerId";
 import Board from "@/common/components/Board";
 import RoomHeader from "@/common/components/RoomHeader";
 import RoomNotFound, { RoomLoading } from "@/common/components/RoomMessage";
@@ -54,15 +55,19 @@ const Replay = (props: Props) => {
   // The direction of the shift cue currently playing, or null at rest.
   const [shiftDirection, setShiftDirection] = useState<Direction | null>(null);
 
+  const playerId = usePlayerId();
+
   // Completed games are immutable, so fetch once and never poll or refetch.
   const { data: game, error } = useQuery<CompletedGameView>({
-    queryKey: ["completedGame", props.id],
-    queryFn: ({ signal }) => fetchCompletedGame(props.id, signal),
+    queryKey: ["completedGame", props.id, playerId],
+    queryFn: ({ signal }) => fetchCompletedGame(props.id, playerId as string, signal),
     staleTime: Infinity,
+    enabled: !!playerId,
   });
 
   const notFound =
-    error instanceof RoomError && error.code === "game-not-found";
+    error instanceof RoomError &&
+    (error.code === "game-not-found" || error.code === "forbidden");
   const loadError = Boolean(error) && !notFound;
 
   const total = game ? game.actions.length : 0;

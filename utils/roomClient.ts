@@ -148,14 +148,22 @@ export function shiftRoom(
 }
 
 export function fetchCompletedGames(
+  playerId: string,
   signal?: AbortSignal,
 ): Promise<CompletedGameSummary[]> {
-  return getJson<CompletedGameSummary[]>("/api/completed", "games", signal);
+  const query = `?playerId=${encodeURIComponent(playerId)}`;
+  return getJson<CompletedGameSummary[]>(
+    `/api/completed${query}`,
+    "games",
+    signal,
+  );
 }
 
 export function fetchCompletedGame(
   id: string,
+  playerId: string,
   signal?: AbortSignal,
 ): Promise<CompletedGameView> {
-  return getJson<CompletedGameView>(`/api/completed/${id}`, "game", signal);
+  const query = `?playerId=${encodeURIComponent(playerId)}`;
+  return getJson<CompletedGameView>(`/api/completed/${id}${query}`, "game", signal);
 }

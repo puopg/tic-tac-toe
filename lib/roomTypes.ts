@@ -64,6 +64,14 @@ export interface CompletedGame {
   mode: RoomMode;
   /** Every action in play order; X takes even indices, O odd. */
   actions: GameAction[];
+  /**
+   * Seat holders at archive time (O is the AI sentinel in AI rooms). Null for
+   * games archived before participants were recorded; those belong to no player
+   * and are never listed. Used only to scope the list to a player; never sent to
+   * the replay view.
+   */
+  playerX: string | null;
+  playerO: string | null;
   completedAt: number;
 }
 
