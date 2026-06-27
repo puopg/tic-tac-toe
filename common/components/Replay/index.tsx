@@ -27,7 +27,7 @@ type Props = {
 const AUTOPLAY_MS = 800;
 
 /** Drop-in duration for a freshly marked cell; owned by Square's stylesheet. */
-const PLACE_ANIMATION_MS = Number(squareStyles.placeMs);
+const PLACE_ANIMATION_MS = Number(squareStyles.placeMs) || 320;
 
 /**
  * How long the shift cue (sliding marks + the directional arrow) stays on the
@@ -35,7 +35,7 @@ const PLACE_ANIMATION_MS = Number(squareStyles.placeMs);
  * timer can't drift apart; it outlasts Square's mark slide so the arrow lingers
  * a beat after the grid settles.
  */
-const SHIFT_ANIMATION_MS = Number(styles.shiftArrowMs);
+const SHIFT_ANIMATION_MS = Number(styles.shiftArrowMs) || 620;
 
 /** Rotation class that points the (right-facing) arrow icon in `dir`. */
 const ARROW_DIR_CLASS: Record<Direction, string> = {

@@ -16,7 +16,7 @@ type Props = {
   shiftDirection?: Direction | null;
   /**
    * Index of the cell just marked, which plays a one-shot drop-in. Null/omitted
-   * (or -1) leaves every mark static.
+   * leaves every mark static.
    */
   placedIndex?: number | null;
 };
