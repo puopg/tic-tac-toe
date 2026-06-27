@@ -66,8 +66,9 @@ game.
   directional arrow are suppressed under `prefers-reduced-motion`.
   The archive survives the room being reset for a new round, so a single room can
   accumulate a history of games. A finished game auto-resets to a fresh round
-  after a short delay (no manual button), with a "Next game starting…" note shown
-  during the countdown.
+  after a short delay (no manual button); a "Next game starting…" label and a
+  shrinking countdown bar show all players and spectators how long remains.
+  The bar animation is disabled under `prefers-reduced-motion`.
 - Responsive, dark-themed UI styled with **SCSS CSS Modules** (no Tailwind).
 
 Room and completed-game state lives in an in-memory server store with no external
