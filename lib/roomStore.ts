@@ -251,6 +251,14 @@ function applyShift(room: Room, direction: Direction): void {
   room.actions.push({ kind: "shift", dir: direction });
 }
 
+/** Clear the board to begin a fresh round, preserving the running scores. */
+function startNewRound(room: Room): void {
+  room.board = EMPTY_BOARD.slice();
+  room.actions = [];
+  room.xIsNext = true;
+  room.oShiftUsed = false;
+}
+
 /** Stamp the room's activity and return a success result. */
 function touched(room: Room): StoreResult {
   room.lastActivity = now();
@@ -459,6 +467,11 @@ export async function claimSeat(
 
     room.seats[seat] = playerId;
     room.seatSeen[seat] = now();
+    // The next round normally auto-resets on a seated player's client, but if
+    // everyone left while the result was still on screen the finished game is
+    // left persisted with nobody to clear it. Someone returning and taking a
+    // seat is exactly that moment, so start a fresh round here as the fallback.
+    if (isGameOver(room.board)) startNewRound(room);
     return touched(room);
   });
 }
@@ -551,10 +564,7 @@ export async function resetGame(
     if (room.seats.X !== playerId && room.seats.O !== playerId) {
       return { ok: false, error: "not-participant" };
     }
-    room.board = EMPTY_BOARD.slice();
-    room.actions = [];
-    room.xIsNext = true;
-    room.oShiftUsed = false;
+    startNewRound(room);
     return touched(room);
   });
 }

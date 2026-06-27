@@ -3,6 +3,7 @@ import {
   claimSeat,
   createRoom,
   getRoom,
+  leaveSeat,
   listCompletedGames,
   listRooms,
   makeMove,
@@ -256,6 +257,70 @@ describe("scoring and completed-game archival on settle", () => {
     expect(room?.board.every((cell) => cell === null)).toBe(true);
     expect(room?.actions).toHaveLength(0);
     expect(room?.xIsNext).toBe(true);
+  });
+});
+
+/** Play a seated room to a full-board draw (no winner). */
+async function playToDraw(id: string): Promise<void> {
+  // Final board has no line:  X X O / O O X / X X O
+  const order: [number, string][] = [
+    [0, PX],
+    [2, PO],
+    [1, PX],
+    [3, PO],
+    [5, PX],
+    [4, PO],
+    [6, PX],
+    [8, PO],
+    [7, PX],
+  ];
+  for (const [index, player] of order) {
+    expect((await makeMove(id, index, player)).ok).toBe(true);
+  }
+}
+
+describe("auto-resetting a stuck finished game on seat claim", () => {
+  it("starts a fresh round when a player takes a seat in a finished room", async () => {
+    const { id } = await seatedRoom();
+    await playToDraw(id);
+
+    // The draw is scored and the board is full and finished.
+    const finished = await getRoom(id);
+    expect(finished?.scores.draws).toBe(1);
+    expect(finished?.board.every((cell) => cell !== null)).toBe(true);
+
+    // Both players leave before the next round begins, so no client is left to
+    // clear the finished game - it stays persisted in its end state.
+    expect((await leaveSeat(id, PX)).ok).toBe(true);
+    expect((await leaveSeat(id, PO)).ok).toBe(true);
+    const stuck = await getRoom(id);
+    expect(stuck?.board.every((cell) => cell !== null)).toBe(true);
+
+    // Returning and taking a seat begins a fresh round automatically, keeping
+    // the running scores from the previous game.
+    expect((await claimSeat(id, "X", PX)).ok).toBe(true);
+    const reset = await getRoom(id);
+    expect(reset?.board.every((cell) => cell === null)).toBe(true);
+    expect(reset?.actions).toHaveLength(0);
+    expect(reset?.xIsNext).toBe(true);
+    expect(reset?.oShiftUsed).toBe(false);
+    expect(reset?.scores.draws).toBe(1); // scoreboard carries over
+    expect(reset?.seats.X).toBe(PX);
+  });
+
+  it("leaves an in-progress game untouched when a seat is claimed", async () => {
+    const created = await createRoom("mid-game", "two-player");
+    if (!created.ok) throw new Error("room creation failed");
+    const { id } = created.room;
+
+    expect((await claimSeat(id, "X", PX)).ok).toBe(true);
+    expect((await makeMove(id, 0, PX)).ok).toBe(true); // a move is on the board
+
+    // A second player taking the open O seat must not wipe the live board.
+    expect((await claimSeat(id, "O", PO)).ok).toBe(true);
+    const room = await getRoom(id);
+    expect(room?.board[0]).toBe("X");
+    expect(room?.actions).toHaveLength(1);
   });
 });
 
