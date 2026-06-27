@@ -565,12 +565,13 @@ export async function resetGame(
     if (room.seats.X !== playerId && room.seats.O !== playerId) {
       return { ok: false, error: "not-participant" };
     }
+    const roundFinished = isGameOver(room.board);
     room.board = EMPTY_BOARD.slice();
     room.actions = [];
     room.xIsNext = true;
     room.oShiftUsed = false;
     // Alternate who moves first each round by swapping the two players' seats.
-    swapSeats(room);
+    if (roundFinished) swapSeats(room);
     return touched(room);
   });
 }

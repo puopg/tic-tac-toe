@@ -430,7 +430,7 @@ const RoomGame = (props: Props) => {
     <div className={styles.root}>
       {roundAnnouncement && (
         <div
-          key={roundAnnouncement + String(actionCount)}
+          key={roundAnnouncement}
           className={styles.roundBanner}
           role="status"
           aria-live="polite"
