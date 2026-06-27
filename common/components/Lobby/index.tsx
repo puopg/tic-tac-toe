@@ -7,6 +7,7 @@ import { IoHelpCircleOutline } from "react-icons/io5";
 import {
   createRoom,
   fetchCompletedGames,
+  fetchGameConfig,
   fetchRooms,
   roomErrorCode,
 } from "@/utils/roomClient";
@@ -16,7 +17,7 @@ import {
   type RoomMode,
   type RoomSummary,
 } from "@/lib/roomTypes";
-import type { Board } from "@/utils/gameLogic";
+import type { Board, ShiftMode } from "@/utils/gameLogic";
 import { usePlayerId } from "@/lib/usePlayerId";
 import MiniBoard from "@/common/components/MiniBoard";
 import ShiftAnimation from "@/common/components/ShiftAnimation";
@@ -96,6 +97,13 @@ const Lobby = () => {
     enabled: Boolean(playerId),
     refetchInterval: 5000,
   });
+  // The active shift mode (an internal POC toggle) so the "How to play" dialog
+  // explains and animates the variant new games will actually use.
+  const { data: shiftMode } = useQuery<ShiftMode>({
+    queryKey: ["shiftMode"],
+    queryFn: ({ signal }) => fetchGameConfig(signal),
+  });
+  const activeShiftMode: ShiftMode = shiftMode ?? "classic";
 
   const createMutation = useMutation({
     mutationFn: (vars: { name: string; mode: RoomMode }) =>
@@ -312,20 +320,41 @@ const Lobby = () => {
           moves second; you take turns placing your mark, and the first to line
           up three in a row - across, down, or diagonally - wins.
         </p>
-        <p className={styles.howToParagraph}>
-          To balance going second, player O gets one special ability: a
-          once-per-game <strong>grid shift</strong>. On O&apos;s turn, instead of
-          placing a mark, O can slide the whole grid one cell - up, down, left,
-          or right. Any marks pushed off the leading edge fall off the board and
-          are removed.
-        </p>
-        <p className={styles.howToParagraph}>
-          The shift uses up O&apos;s turn, so players still alternate strictly, and
-          O only gets it once per game. A shift only translates marks, so it can
-          never complete a line and never wins on its own - it is purely O&apos;s
-          compensation for moving second.
-        </p>
-        <ShiftAnimation />
+        {activeShiftMode === "collapse" ? (
+          <>
+            <p className={styles.howToParagraph}>
+              To balance going second, player O gets one special ability: a
+              once-per-game <strong>grid collapse</strong>. On O&apos;s turn,
+              instead of placing a mark, O can collapse the whole grid - up,
+              down, left, or right. Every mark slides as far as it can that way
+              and stacks against the leading edge.
+            </p>
+            <p className={styles.howToParagraph}>
+              Collisions are decided by who is moving: an X ploughs through and
+              removes any O in its path, while an O is blocked by an X, and
+              same-kind marks stack against each other. The collapse uses up
+              O&apos;s turn, and because marks can line up, a collapse
+              <em> can</em> complete three in a row and win on the spot.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className={styles.howToParagraph}>
+              To balance going second, player O gets one special ability: a
+              once-per-game <strong>grid shift</strong>. On O&apos;s turn,
+              instead of placing a mark, O can slide the whole grid one cell -
+              up, down, left, or right. Any marks pushed off the leading edge
+              fall off the board and are removed.
+            </p>
+            <p className={styles.howToParagraph}>
+              The shift uses up O&apos;s turn, so players still alternate
+              strictly, and O only gets it once per game. A shift only
+              translates marks, so it can never complete a line and never wins
+              on its own - it is purely O&apos;s compensation for moving second.
+            </p>
+          </>
+        )}
+        <ShiftAnimation mode={activeShiftMode} />
       </UIDialog>
     </div>
   );

@@ -58,14 +58,24 @@
   color: var(--o-color);
 }
 
-// Surviving marks slide exactly one cell in the shift direction.
+// Surviving marks slide `--shift-cells` cells in the shift direction: one cell
+// for a classic shift, or as far as the mark travels when the grid collapses.
 .shifted {
-  transform: translateX(calc(100% + var(--cell-gap)));
+  transform: translateX(
+    calc((100% + var(--cell-gap)) * var(--shift-cells, 1))
+  );
 }
 
 // Marks pushed off the leading edge drift past it and downward as they fade.
 .fallOff {
   transform: translate(calc(130% + var(--cell-gap)), 38%) scale(0.82);
+  opacity: 0;
+}
+
+// An O an X ploughs through during a collapse: it is overrun in place, fading
+// and shrinking as the advancing X slides onto its cell.
+.captured {
+  transform: scale(0.35) rotate(-12deg);
   opacity: 0;
 }
 
