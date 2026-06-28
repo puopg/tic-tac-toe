@@ -207,7 +207,11 @@ const RoomGame = (props: Props) => {
 
       <div className={styles.playArea}>
         <div className={styles.historySlot}>
-          <BoardHistory actions={room.actions} />
+          <BoardHistory
+            actions={room.actions}
+            size={room.size}
+            winLength={room.winLength}
+          />
         </div>
 
         {/* At rest the board fills the whole frame. Arming the picker scales the

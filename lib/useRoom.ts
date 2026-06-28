@@ -436,7 +436,7 @@ export function useRoom(id: string, opts: UseRoomOptions): UseRoomResult {
       kind: "shift",
       direction: latest.dir,
       mode: latest.mode ?? DEFAULT_SHIFT_MODE,
-      from: boardAfterActions(room.actions, count - 1),
+      from: boardAfterActions(room.actions, count - 1, room.size),
     };
   });
 
