@@ -5,7 +5,12 @@
  * timers that depend on it read from one source.
  */
 
-/** A mark's slide to its settled cell, and a swept mark's slide off the grid. */
+/**
+ * Budget RoomGame's deferred AI reply allows for a shift's marks to slide and
+ * settle before the AI's move is revealed. The slide itself animates on a spring
+ * in <Board>, so this is a comfortable upper bound on its settle time, not the
+ * exact animation length.
+ */
 export const SHIFT_SLIDE_MS = 280;
 
 /** Drop-in of a freshly placed mark. */

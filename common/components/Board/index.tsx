@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import classNames from "classnames";
-import { animated, to, useTransition } from "@react-spring/web";
+import { animated, to, useSpring, useTransition } from "@react-spring/web";
 import { INITIAL_SIZE } from "@/constants/game";
-import { SHIFT_SLIDE_MS } from "@/constants/animation";
 import {
   shiftPlan,
   type Board as BoardState,
@@ -43,6 +42,57 @@ const STEP: Record<Direction, [number, number]> = {
 /** How far (in cells) a swept mark slides past its cell as it leaves - just
  *  enough to clear the edge while it fades and shrinks, not across the board. */
 const DEPART_CELLS = 1.15;
+
+// Physics-based spring configs (tension/friction) rather than fixed durations,
+// so motion eases in and settles naturally instead of reading as a linear
+// tween. Tuned per phase: a snappy pop-in for a placed mark, a firm glide for
+// the grid slide, and a slightly springier straighten/shrink as a swept mark
+// drops away off-board. The slide and depart `clamp` so they stop dead at their
+// target instead of overshooting and bouncing - a mark must land squarely in
+// its cell.
+const ENTER_SPRING = { tension: 320, friction: 20 };
+const SLIDE_SPRING = { tension: 260, friction: 26, clamp: true };
+const DEPART_SPRING = { tension: 300, friction: 22, clamp: true };
+
+// ─── Shift-sway tuning knobs ────────────────────────────────────────────────
+// As the grid shifts, every mark leans into its travel - a tilt going sideways,
+// a squish going up/down - then springs back upright as it settles. A single
+// board-level spring pulses 0 -> 1 -> 0 once per shift and each mark scales the
+// peaks below by it, so the whole grid sways as one. Tweak these freely:
+
+/** Peak tilt for a horizontal (left/right) sweep, in degrees. 0 = no tilt. */
+const LEAN_TILT_DEG = 8;
+
+/** Peak squish for a vertical (up/down) sweep, as a fraction of the mark's
+ *  height (0.18 = squished to 82% tall). Affects scaleY only. 0 = no squish. */
+const LEAN_SQUASH = 0.18;
+
+/** How the lean springs *out* into its tilt/squish as the shift starts - a
+ *  spring, not a fixed duration, for fluid motion. Raise `tension` for a
+ *  snappier whip into the lean, raise `friction` to ease it in more slowly;
+ *  `clamp` stops it cleanly at the peak with no overshoot. */
+const LEAN_SPRING = { tension: 700, friction: 26, clamp: true };
+
+/** How long the lean holds before it springs back upright, in ms, timed from the
+ *  start of the shift. The departing marks also begin to fade and shrink at this
+ *  point, so raising it holds the lean (and the full-size marks) longer before
+ *  the release. The springiness of the release itself is `DEPART_SPRING`. */
+const LEAN_RELEASE_DELAY_MS = 160;
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Peak lean per travel direction, scaled by the shared lean spring. Horizontal
+ * sweeps tilt (a leftward sweep tips clockwise, rightward counter-clockwise,
+ * mirroring the "How to play" illustration in ShiftAnimation); vertical sweeps
+ * squish instead, since a z-rotation reads as nothing for straight up/down
+ * travel. Flip a sign to reverse which way a direction leans.
+ */
+const DEPART_LEAN: Record<Direction, { rotate: number; squash: number }> = {
+  left: { rotate: LEAN_TILT_DEG, squash: 0 },
+  right: { rotate: -LEAN_TILT_DEG, squash: 0 },
+  top: { rotate: 0, squash: LEAN_SQUASH },
+  bottom: { rotate: 0, squash: LEAN_SQUASH },
+};
 
 /** Marks for `board`, reusing the prior sprite at each cell so ids stay stable
  *  (a cell whose mark is unchanged keeps its id and therefore does not animate). */
@@ -169,27 +219,67 @@ const Board = (props: Props) => {
     y: row * (cell + GAP),
   });
 
+  // One board-level "lean" spring shared by every mark: it pulses 0 -> 1 -> 0
+  // once per shift (see the effect below) and each mark's transform scales the
+  // direction's peak tilt/squash by it. Lifting the lean here - rather than
+  // driving it per sprite through useTransition's `update`, which re-runs every
+  // render and would replay the sway on unrelated re-renders - lets survivors
+  // and departing marks sway together off one source of truth.
+  const [leanStyle, leanApi] = useSpring(() => ({ lean: 0 }));
+  useEffect(() => {
+    if (!transition || transition.kind !== "shift" || reducedMotion) return;
+    // Spring into the lean as the grid starts moving, hold, then - nearing the
+    // settle - spring it back to neutral. The unawaited lean-out lets the
+    // delayed release overlap the tail of the slide rather than waiting for it.
+    leanApi.start({
+      to: async (next) => {
+        void next({ lean: 1, config: LEAN_SPRING });
+        await next({ lean: 0, delay: LEAN_RELEASE_DELAY_MS, config: DEPART_SPRING });
+      },
+    });
+  }, [transition, reducedMotion, leanApi]);
+
   const transitions = useTransition(sprites, {
     keys: (s) => s.id,
     from: (s) => ({ ...point(s.row, s.col), opacity: 0, scale: 0.4 }),
     enter: (s) => ({ ...point(s.row, s.col), opacity: 1, scale: 1 }),
     update: (s) => ({ ...point(s.row, s.col), opacity: 1, scale: 1 }),
     leave: (s) => {
-      // A swept mark slides just past the leading edge while it fades and
-      // shrinks, so it reads as falling off the grid.
+      // Only a shift sweeps a mark off the grid; every other removal (reset,
+      // replay jump, reduced motion) snaps - the same `immediate` cases the
+      // enter/update springs honor. The async leave below drives its own
+      // springs, so the transition-wide `immediate` flag doesn't reach it; we
+      // branch on it here instead, or a reset would slide every mark away. The
+      // sway itself rides the shared lean spring above; here the mark just
+      // slides off and, nearing its off-board resting spot, fades and shrinks.
+      const snap = immediateRef.current || reducedMotion;
       const [dr, dc] = STEP[departDirRef.current];
-      return {
-        ...point(s.row + dr * DEPART_CELLS, s.col + dc * DEPART_CELLS),
-        opacity: 0,
-        scale: 0.2,
+      return async (next: (props: object) => Promise<void>) => {
+        if (snap) {
+          await next({ opacity: 0, immediate: true });
+          return;
+        }
+        void next({
+          ...point(s.row + dr * DEPART_CELLS, s.col + dc * DEPART_CELLS),
+          config: SLIDE_SPRING,
+        });
+        await next({
+          opacity: 0,
+          scale: 0.2,
+          delay: LEAN_RELEASE_DELAY_MS,
+          config: DEPART_SPRING,
+        });
       };
     },
     immediate: immediateRef.current || reducedMotion,
     config: (_s, _i, phase) =>
-      phase === "enter"
-        ? { tension: 320, friction: 20 }
-        : { duration: SHIFT_SLIDE_MS },
+      phase === "enter" ? ENTER_SPRING : SLIDE_SPRING,
   });
+
+  // Peak tilt/squish for the in-flight shift's direction; the shared lean spring
+  // scales between 0 (upright) and these values. Harmless at rest - lean is 0,
+  // so the direction left over from the last shift contributes nothing.
+  const leanPeak = DEPART_LEAN[departDirRef.current];
 
   return (
     <div
@@ -223,8 +313,15 @@ const Board = (props: Props) => {
                 fontSize: cell * 0.56,
                 opacity: style.opacity,
                 transform: to(
-                  [style.x, style.y, style.scale],
-                  (x, y, s) => `translate(${x}px, ${y}px) scale(${s})`,
+                  [style.x, style.y, style.scale, leanStyle.lean],
+                  (x, y, s, l) => {
+                    // The shared lean spring (l: 0..1) scales the direction's
+                    // peak sway. scaleY alone carries the squash, so a vertical
+                    // sweep just squishes the mark; scaleX stays at the scale.
+                    const r = leanPeak.rotate * l;
+                    const sy = s * (1 - leanPeak.squash * l);
+                    return `translate(${x}px, ${y}px) rotate(${r}deg) scale(${s}, ${sy})`;
+                  },
                 ),
               }}
             >

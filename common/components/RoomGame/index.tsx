@@ -116,11 +116,6 @@ const RoomGame = (props: Props) => {
   // direction buttons are mounted whenever O can shift but hidden (opacity: 0)
   // at rest so cancelling can reverse the fade-in before the board grows back.
   const [shiftActive, setShiftActive] = useState(false);
-  // The board animation cue handed to <Board>, or null when the board is at
-  // rest. Set whenever a shift lands (locally or pushed from another client) so
-  // the marks slide and swept marks fall off; cleared once the slide finishes.
-  const [boardTransition, setBoardTransition] =
-    useState<BoardTransition | null>(null);
 
   const roomKey = useMemo(
     () => ["room", props.id, playerId] as const,
@@ -387,42 +382,46 @@ const RoomGame = (props: Props) => {
     if (!canShiftNow && shiftActive) setShiftActive(false);
   }, [canShiftNow, shiftActive]);
 
-  // Animate the board whenever a shift lands. The ordered action log is the one
+  // Derive the board's shift-animation cue during render - not in an effect - so
+  // the post-shift board and its cue reach <Board> in the same render. An effect
+  // lands a render late: <Board> would first see the new board with no cue, snap
+  // the swept marks away, and have nothing left to animate off by the time the
+  // cue arrived (the departing-marks bug). The ordered action log is the one
   // signal that fires for every client - the shifting player, the opponent, and
-  // spectators alike - so we watch it grow and trigger the slide when the newest
-  // action is a shift. The ref seeds on first load so an already-shifted game
-  // joined mid-play doesn't replay the motion; a shrinking log (reset/rewind)
-  // just reseeds.
-  const prevActionCountRef = useRef<number | null>(null);
-  const actionsRef = useRef(room?.actions);
-  actionsRef.current = room?.actions;
+  // spectators alike - so we watch it grow and build the cue when the newest
+  // action is a shift, reading the pre-shift board so <Board> can slide each mark
+  // to where it settles and sweep the departing marks off the grid.
+  //
+  // The cue lives in a ref and is rebuilt only when the log grows by a shift, so
+  // the same object identity is handed to <Board> on later renders; <Board>
+  // animates only on a fresh identity, so a stable ref is what stops it from
+  // re-firing - no clear-after-timeout needed. The ref seeds to null on first
+  // load so an already-shifted game joined mid-play doesn't replay the motion,
+  // and reseeds when the log shrinks (reset/rewind). Mutating refs during render
+  // is strict-mode-safe here: the count guard makes the second invocation a
+  // no-op.
   const actionCount = room?.actions.length ?? null;
-  useEffect(() => {
-    if (actionCount === null) return;
+  const prevActionCountRef = useRef<number | null>(null);
+  const boardTransitionRef = useRef<BoardTransition | null>(null);
+  if (room && actionCount !== null) {
     const prev = prevActionCountRef.current;
-    prevActionCountRef.current = actionCount;
-    if (prev === null || actionCount <= prev) return;
-    const actions = actionsRef.current ?? [];
-    const latest = actions[actionCount - 1];
-    if (latest?.kind === "shift") {
-      // Hand <Board> the pre-shift board so its marks layer can animate each
-      // mark to where it settles and slide the swept marks off the grid.
-      setBoardTransition({
-        kind: "shift",
-        direction: latest.dir,
-        mode: latest.mode ?? DEFAULT_SHIFT_MODE,
-        from: boardAfterActions(actions, actionCount - 1),
-      });
+    if (prev !== null && actionCount > prev) {
+      const latest = room.actions[actionCount - 1];
+      if (latest?.kind === "shift") {
+        boardTransitionRef.current = {
+          kind: "shift",
+          direction: latest.dir,
+          mode: latest.mode ?? DEFAULT_SHIFT_MODE,
+          from: boardAfterActions(room.actions, actionCount - 1),
+        };
+      }
+    } else if (prev === null || actionCount < prev) {
+      // First load or a shrinking log (reset/rewind): seed/reseed at rest.
+      boardTransitionRef.current = null;
     }
-  }, [actionCount]);
-
-  // Clear the cue once the slide has played; <Board> ignores the null and keeps
-  // the board at rest, so this just stops the cue from re-firing.
-  useEffect(() => {
-    if (!boardTransition) return;
-    const timer = setTimeout(() => setBoardTransition(null), SHIFT_ANIMATION_MS);
-    return () => clearTimeout(timer);
-  }, [boardTransition]);
+    prevActionCountRef.current = actionCount;
+  }
+  const boardTransition = boardTransitionRef.current;
 
   // Announce the start of each new round. A reset swaps the two players' seats
   // (see resetGame), so the seat I now hold tells me whether I move first (X) or
