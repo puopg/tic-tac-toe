@@ -1,5 +1,3 @@
-import { INITIAL_SIZE } from "@/constants/game";
-
 /** Start and end points of the winning-line overlay, as percentages (0-100). */
 export interface WinningLineCoords {
   x1: number;
@@ -9,15 +7,18 @@ export interface WinningLineCoords {
 }
 
 /**
- * Center of cell `index` as `{ x, y }` percentages (0-100) of the board's
- * grid area. Columns and rows are derived from the flat index
- * (`col = index % size`, `row = index / size`) and each cell's center sits at
- * `(n + 0.5) / size`, so the geometry stays correct at any board size.
+ * Center of cell `index` on a `size`×`size` board as `{ x, y }` percentages
+ * (0-100) of the board's grid area. Columns and rows are derived from the flat
+ * index (`col = index % size`, `row = index / size`) and each cell's center sits
+ * at `(n + 0.5) / size`, so the geometry stays correct at any board size.
  */
-export function cellCenter(index: number): { x: number; y: number } {
-  const col = index % INITIAL_SIZE;
-  const row = Math.floor(index / INITIAL_SIZE);
-  const unit = 100 / INITIAL_SIZE;
+export function cellCenter(
+  index: number,
+  size: number,
+): { x: number; y: number } {
+  const col = index % size;
+  const row = Math.floor(index / size);
+  const unit = 100 / size;
   return { x: (col + 0.5) * unit, y: (row + 0.5) * unit };
 }
 
@@ -43,9 +44,12 @@ const ENDPOINT_EXTEND = 0.7;
  * line - so it stays resize-safe (everything is percentages) for every
  * orientation.
  */
-export function winningLineCoords(line: readonly number[]): WinningLineCoords {
-  const start = cellCenter(line[0]);
-  const end = cellCenter(line[line.length - 1]);
+export function winningLineCoords(
+  line: readonly number[],
+  size: number,
+): WinningLineCoords {
+  const start = cellCenter(line[0], size);
+  const end = cellCenter(line[line.length - 1], size);
   const ext = ENDPOINT_EXTEND * 0.25;
   const dx = end.x - start.x;
   const dy = end.y - start.y;

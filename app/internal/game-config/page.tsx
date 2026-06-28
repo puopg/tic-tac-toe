@@ -1,7 +1,16 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchGameConfig, setGameShiftMode } from "@/utils/roomClient";
+import {
+  MAX_BOARD_SIZE,
+  MIN_BOARD_SIZE,
+  MIN_WIN_LENGTH,
+} from "@/constants/game";
+import {
+  fetchGameConfig,
+  setGameConfig,
+  type GameConfig,
+} from "@/utils/roomClient";
 import {
   shiftBoard,
   type Board,
@@ -32,24 +41,29 @@ const MODE_COPY: Record<ShiftMode, { title: string; blurb: string }> = {
   },
 };
 
+/** Inclusive integer range [min, max] as an array, for the segmented controls. */
+const range = (min: number, max: number): number[] =>
+  Array.from({ length: max - min + 1 }, (_, i) => min + i);
+
 /**
- * Internal POC tool at /internal/game-config for toggling the experimental
- * shift behaviour on and off. Deliberately unauthenticated - anyone can flip it.
+ * Internal POC tool at /internal/game-config for trying out rule variants: the
+ * experimental shift behaviour, the board size, and the run length needed to
+ * win. Deliberately unauthenticated - anyone can flip it.
  */
 const GameConfigPage = () => {
   const queryClient = useQueryClient();
 
-  const { data: shiftMode, isPending } = useQuery({
+  const { data: config, isPending } = useQuery({
     queryKey: GAME_CONFIG_KEY,
     queryFn: ({ signal }) => fetchGameConfig(signal),
   });
 
   const mutation = useMutation({
-    mutationFn: setGameShiftMode,
-    onSuccess: (mode) => queryClient.setQueryData(GAME_CONFIG_KEY, mode),
+    mutationFn: setGameConfig,
+    onSuccess: (next) => queryClient.setQueryData(GAME_CONFIG_KEY, next),
   });
 
-  if (isPending || !shiftMode) {
+  if (isPending || !config) {
     return (
       <main className={styles.main}>
         <Spinner label="Loading config" />
@@ -57,15 +71,69 @@ const GameConfigPage = () => {
     );
   }
 
+  const update = (patch: Partial<GameConfig>) => mutation.mutate(patch);
+  const emptyBoard: Board = Array(config.boardSize * config.boardSize).fill(null);
+
   return (
     <main className={styles.main}>
       <header className={styles.header}>
         <h1 className={styles.title}>Game config</h1>
         <p className={styles.subtitle}>
-          Internal POC controls. Changes apply to new shifts only; games already
-          played keep the rules they were played with.
+          Internal POC controls. Changes apply to new games only; games already
+          created keep the size, win length, and shift rule they started with.
         </p>
       </header>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Board size</h2>
+        <p className={styles.subtitle}>
+          New games are played on an N×N board, from {MIN_BOARD_SIZE} up to{" "}
+          {MAX_BOARD_SIZE} cells per side.
+        </p>
+        <div className={styles.segmented} role="group" aria-label="Board size">
+          {range(MIN_BOARD_SIZE, MAX_BOARD_SIZE).map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={styles.segment}
+              aria-pressed={config.boardSize === n}
+              disabled={mutation.isPending}
+              onClick={() => update({ boardSize: n })}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Win length</h2>
+        <p className={styles.subtitle}>
+          How many of your marks in a row - across, down, or diagonally - wins.
+          Capped at the board size.
+        </p>
+        <div className={styles.segmented} role="group" aria-label="Win length">
+          {range(MIN_WIN_LENGTH, config.boardSize).map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={styles.segment}
+              aria-pressed={config.winLength === n}
+              disabled={mutation.isPending}
+              onClick={() => update({ winLength: n })}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+        <figure className={styles.preview}>
+          <MiniBoard board={emptyBoard} />
+          <figcaption>
+            {config.boardSize}×{config.boardSize} board, {config.winLength} in a
+            row to win
+          </figcaption>
+        </figure>
+      </section>
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>O&rsquo;s shift behaviour</h2>
@@ -75,9 +143,9 @@ const GameConfigPage = () => {
               key={mode}
               type="button"
               className={styles.option}
-              aria-pressed={shiftMode === mode}
+              aria-pressed={config.shiftMode === mode}
               disabled={mutation.isPending}
-              onClick={() => mutation.mutate(mode)}
+              onClick={() => update({ shiftMode: mode })}
             >
               <span className={styles.optionTitle}>{MODE_COPY[mode].title}</span>
               <span className={styles.optionBlurb}>{MODE_COPY[mode].blurb}</span>
@@ -85,7 +153,7 @@ const GameConfigPage = () => {
           ))}
         </div>
         <p className={styles.active}>
-          Active mode: <strong>{MODE_COPY[shiftMode].title}</strong>
+          Active mode: <strong>{MODE_COPY[config.shiftMode].title}</strong>
         </p>
       </section>
 
