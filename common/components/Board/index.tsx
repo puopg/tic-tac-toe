@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import classNames from "classnames";
-import { animated, to, useSpring, useTransition } from "@react-spring/web";
+import {
+  animated,
+  to,
+  useSpring,
+  useTransition,
+  type SpringValue,
+} from "@react-spring/web";
 import {
   boardSize,
   DIRECTION_STEPS,
@@ -189,6 +195,62 @@ type Props = {
   animation?: BoardAnimationConfig;
 };
 
+/** The animated x/y/scale/opacity springs `useTransition` drives for one mark. */
+type SpriteStyle = {
+  x: SpringValue<number>;
+  y: SpringValue<number>;
+  scale: SpringValue<number>;
+  opacity: SpringValue<number>;
+};
+
+/**
+ * One animated mark in the overlay: it positions/fades/scales off its own
+ * transition springs (`style`) and composes in the shared shift lean - the
+ * board-level `lean` spring (0..1) scaling `leanPeak`'s tilt/squash, but only
+ * for marks that move this shift (`sprite.leans`), so the rest stay still.
+ */
+const MarkSprite = (props: {
+  style: SpriteStyle;
+  sprite: Sprite;
+  cell: number;
+  lean: SpringValue<number>;
+  leanPeak: { rotate: number; squash: number };
+  squashOrigin: string;
+}) => {
+  const { style, sprite, cell, lean, leanPeak, squashOrigin } = props;
+  return (
+    <animated.div
+      className={classNames(
+        styles.mark,
+        sprite.player === "X" ? styles.x : styles.o,
+      )}
+      style={{
+        width: cell,
+        height: cell,
+        fontSize: cell * 0.56,
+        opacity: style.opacity,
+        transformOrigin: squashOrigin,
+        transform: to(
+          [style.x, style.y, style.scale, lean],
+          (x, y, s, l) => {
+            // The shared lean spring (l: 0..1) scales the direction's peak
+            // sway - but only for marks that actually move this shift, so a
+            // stationary mark stays perfectly still. scaleY alone carries the
+            // squash, so a vertical sweep just squishes the mark; scaleX stays
+            // at the scale.
+            const m = sprite.leans ? l : 0;
+            const r = leanPeak.rotate * m;
+            const sy = s * (1 - leanPeak.squash * m);
+            return `translate(${x}px, ${y}px) rotate(${r}deg) scale(${s}, ${sy})`;
+          },
+        ),
+      }}
+    >
+      {sprite.player}
+    </animated.div>
+  );
+};
+
 const Board = (props: Props) => {
   const { board, transition } = props;
   const anim = props.animation ?? DEFAULT_BOARD_ANIMATION;
@@ -372,35 +434,14 @@ const Board = (props: Props) => {
       <div ref={layerRef} className={styles.marks} aria-hidden="true">
         {cell > 0 &&
           transitions((style, sprite) => (
-            <animated.div
-              className={classNames(
-                styles.mark,
-                sprite.player === "X" ? styles.x : styles.o,
-              )}
-              style={{
-                width: cell,
-                height: cell,
-                fontSize: cell * 0.56,
-                opacity: style.opacity,
-                transformOrigin: squashOrigin,
-                transform: to(
-                  [style.x, style.y, style.scale, leanStyle.lean],
-                  (x, y, s, l) => {
-                    // The shared lean spring (l: 0..1) scales the direction's
-                    // peak sway - but only for marks that actually move this
-                    // shift, so a stationary mark stays perfectly still. scaleY
-                    // alone carries the squash, so a vertical sweep just squishes
-                    // the mark; scaleX stays at the scale.
-                    const lean = sprite.leans ? l : 0;
-                    const r = leanPeak.rotate * lean;
-                    const sy = s * (1 - leanPeak.squash * lean);
-                    return `translate(${x}px, ${y}px) rotate(${r}deg) scale(${s}, ${sy})`;
-                  },
-                ),
-              }}
-            >
-              {sprite.player}
-            </animated.div>
+            <MarkSprite
+              style={style}
+              sprite={sprite}
+              cell={cell}
+              lean={leanStyle.lean}
+              leanPeak={leanPeak}
+              squashOrigin={squashOrigin}
+            />
           ))}
       </div>
 
