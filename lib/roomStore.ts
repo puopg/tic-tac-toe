@@ -570,15 +570,16 @@ export async function removeViewer(
 }
 
 /**
- * How many people are currently watching room `id`. Expired presence rows (past
- * {@link VIEWER_TTL_MS}) are swept first - across all rooms, to bound the table -
- * then the room's surviving rows are counted. Seated players are watchers too, so
- * they are included; the count is simply everyone with a live heartbeat here.
+ * How many people are currently watching room `id`. Only rows whose `lastSeen`
+ * is within {@link VIEWER_TTL_MS} are counted, so the compound `(roomId,
+ * lastSeen)` index is used cleanly. Seated players are included — everyone with
+ * a live heartbeat here is a viewer.
  */
 export async function countViewers(id: string): Promise<number> {
   const cutoff = new Date(now() - VIEWER_TTL_MS);
-  await prisma.roomViewer.deleteMany({ where: { lastSeen: { lt: cutoff } } });
-  return prisma.roomViewer.count({ where: { roomId: id } });
+  return prisma.roomViewer.count({
+    where: { roomId: id, lastSeen: { gte: cutoff } },
+  });
 }
 
 export function toCompletedSummary(game: CompletedGame): CompletedGameSummary {

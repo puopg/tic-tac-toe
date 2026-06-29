@@ -612,7 +612,7 @@ describe("viewer presence counting", () => {
     expect(await countViewers(b.room.id)).toBe(2);
   });
 
-  it("sweeps viewers whose heartbeat has expired past the TTL", async () => {
+  it("excludes viewers whose heartbeat has expired past the TTL", async () => {
     const created = await createRoom("viewed room", "two-player");
     if (!created.ok) throw new Error("room creation failed");
     const { id } = created.room;
@@ -626,11 +626,10 @@ describe("viewer presence counting", () => {
       data: { lastSeen: new Date(Date.now() - 60_000) },
     });
 
-    // The next count sweeps the expired row and excludes it.
+    // The count excludes the expired row without deleting it.
     expect(await countViewers(id)).toBe(1);
-    // The sweep is a real delete, not just a filtered count.
     const rows = await prisma.roomViewer.findMany({ where: { roomId: id } });
-    expect(rows.map((r) => r.playerId)).toEqual(["fresh"]);
+    expect(rows.map((r) => r.playerId).sort()).toEqual(["fresh", "stale"]);
   });
 
   it("drops a viewer immediately on removeViewer", async () => {
