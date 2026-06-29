@@ -119,9 +119,11 @@ const Lobby = () => {
   const activeSize = gameConfig?.boardSize ?? 3;
   const activeWinLength = gameConfig?.winLength ?? 3;
 
+  // Only online multiplayer creates a server room; single-device games are
+  // started straight from the client (see startClientGame), so the mutation is
+  // always a two-player create.
   const createMutation = useMutation({
-    mutationFn: (vars: { name: string; mode: RoomMode }) =>
-      createRoom(vars.name, vars.mode),
+    mutationFn: (roomName: string) => createRoom(roomName, "two-player"),
     onSuccess: (room) => {
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
       router.push(`/room/${room.id}`);
@@ -129,7 +131,6 @@ const Lobby = () => {
   });
 
   const [name, setName] = useState("");
-  const [mode, setMode] = useState<RoomMode>("two-player");
   const [formError, setFormError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [howToOpen, setHowToOpen] = useState(false);
@@ -147,7 +148,9 @@ const Lobby = () => {
     if (page !== activePage) setPage(activePage);
   }, [page, activePage]);
 
-  const handleCreate = useCallback(
+  // Create an online multiplayer room (the only mode that lives on the server)
+  // and join it. A name is required so the room is identifiable in the lobby.
+  const handleCreateRoom = useCallback(
     async (event: React.FormEvent) => {
       event.preventDefault();
       if (createMutation.isPending) return;
@@ -158,7 +161,7 @@ const Lobby = () => {
       }
       setFormError(null);
       try {
-        await createMutation.mutateAsync({ name: trimmed, mode });
+        await createMutation.mutateAsync(trimmed);
       } catch (err) {
         const code = roomErrorCode(err);
         setFormError(
@@ -168,7 +171,14 @@ const Lobby = () => {
         );
       }
     },
-    [createMutation, name, mode],
+    [createMutation, name],
+  );
+
+  // Start a single-device game (vs-AI or local pass-and-play). These run wholly
+  // in the browser - no server room, no name - so it is a plain navigation.
+  const startClientGame = useCallback(
+    (clientMode: "ai" | "local") => router.push(`/play/${clientMode}`),
+    [router],
   );
 
   return (
@@ -191,172 +201,173 @@ const Lobby = () => {
         </p>
       </header>
 
-      {stats && stats.won + stats.lost + stats.drawn > 0 && (
-        <dl className={styles.stats} aria-label="Your record">
-          <div className={styles.statItem}>
-            <dt className={styles.statLabel}>Won</dt>
-            <dd className={`${styles.statValue} ${styles.statWon}`}>
-              {stats.won}
-            </dd>
-          </div>
-          <div className={styles.statItem}>
-            <dt className={styles.statLabel}>Lost</dt>
-            <dd className={`${styles.statValue} ${styles.statLost}`}>
-              {stats.lost}
-            </dd>
-          </div>
-          <div className={styles.statItem}>
-            <dt className={styles.statLabel}>Drawn</dt>
-            <dd className={styles.statValue}>{stats.drawn}</dd>
-          </div>
-        </dl>
-      )}
-
-      <form className={styles.createForm} onSubmit={handleCreate}>
-        <input
-          className={styles.nameInput}
-          type="text"
-          placeholder="Room name"
-          value={name}
-          maxLength={40}
-          onChange={(e) => setName(e.target.value)}
-          aria-label="Room name"
-        />
-        <div className={styles.modeToggle} role="group" aria-label="Game mode">
-          <button
-            type="button"
-            className={mode === "two-player" ? styles.modeActive : styles.mode}
-            onClick={() => setMode("two-player")}
-            aria-pressed={mode === "two-player"}
-          >
-            2 Player
-          </button>
-          <button
-            type="button"
-            className={mode === "ai" ? styles.modeActive : styles.mode}
-            onClick={() => setMode("ai")}
-            aria-pressed={mode === "ai"}
-          >
-            vs AI
-          </button>
-          <button
-            type="button"
-            className={mode === "local" ? styles.modeActive : styles.mode}
-            onClick={() => setMode("local")}
-            aria-pressed={mode === "local"}
-          >
-            Local
-          </button>
-        </div>
-        <button
-          type="submit"
-          className={styles.createButton}
-          disabled={createMutation.isPending}
-        >
-          {createMutation.isPending ? "Creating…" : "New room"}
-        </button>
-      </form>
-      {formError && <p className={styles.formError}>{formError}</p>}
-
-      {roomsLoading && <Spinner label="Loading rooms…" />}
-
-      {Boolean(error) && !rooms && (
-        <p className={styles.loadError}>Could not load rooms. Retrying…</p>
-      )}
-
-      {rooms && rooms.length === 0 && (
-        <div className={styles.empty}>
-          <p className={styles.emptyTitle}>No rooms yet</p>
-          <p className={styles.emptyHint}>
-            Create the first room above to start playing.
-          </p>
-        </div>
-      )}
-
-      {rooms && rooms.length > 0 && pageRooms && (
-        <ul className={styles.roomList}>
-          {pageRooms.map((room) => (
-            <GameCard
-              key={room.id}
-              board={room.board}
-              name={room.name}
-              mode={room.mode}
-              onClick={() => router.push(`/room/${room.id}`)}
-              badgeClass={`${styles.badge} ${styles[`badge_${room.status === "in-progress" ? "inProgress" : room.status}`]}`}
-              badgeLabel={STATUS_LABEL[room.status]}
+      <div className={styles.body}>
+        <div className={styles.mainColumn}>
+          {/* Single-device games: start instantly, no room or name needed. */}
+          <div className={styles.quickPlay}>
+            <button
+              type="button"
+              className={styles.quickPlayButton}
+              onClick={() => startClientGame("ai")}
             >
-              <div className={styles.seats}>
-                {room.mode === "local" && room.seatsTaken.X && room.seatsTaken.O ? (
-                  <span className={styles.seatTaken}>1 player (X &amp; O)</span>
-                ) : (
-                  <>
-                    <span className={room.seatsTaken.X ? styles.seatTaken : styles.seatOpen}>
-                      X {room.seatsTaken.X ? "taken" : "open"}
-                    </span>
-                    <span className={room.seatsTaken.O ? styles.seatTaken : styles.seatOpen}>
-                      O {room.seatsTaken.O ? "taken" : "open"}
-                    </span>
-                  </>
-                )}
-              </div>
-            </GameCard>
-          ))}
-        </ul>
-      )}
+              Play vs AI
+            </button>
+            <button
+              type="button"
+              className={styles.quickPlayButton}
+              onClick={() => startClientGame("local")}
+            >
+              Play local
+            </button>
+          </div>
 
-      {totalPages > 1 && (
-        <nav className={styles.pagination} aria-label="Rooms pages">
-          <button
-            type="button"
-            className={styles.pageButton}
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
-            disabled={activePage === 0}
-          >
-            Previous
-          </button>
-          <span className={styles.pageStatus} aria-live="polite">
-            Page {activePage + 1} of {totalPages}
-          </span>
-          <button
-            type="button"
-            className={styles.pageButton}
-            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-            disabled={activePage === totalPages - 1}
-          >
-            Next
-          </button>
-        </nav>
-      )}
+          {/* Online multiplayer: name the room and create it on the server. */}
+          <form className={styles.createForm} onSubmit={handleCreateRoom}>
+            <input
+              className={styles.nameInput}
+              type="text"
+              placeholder="Create multiplayer room"
+              value={name}
+              maxLength={40}
+              onChange={(e) => setName(e.target.value)}
+              aria-label="Create multiplayer room"
+            />
+            <button
+              type="submit"
+              className={styles.createButton}
+              disabled={createMutation.isPending}
+            >
+              {createMutation.isPending ? "Creating…" : "Create room"}
+            </button>
+          </form>
+          {formError && <p className={styles.formError}>{formError}</p>}
 
-      {completed && completed.length > 0 && (
-        <section className={styles.completedSection}>
-          <h2 className={styles.sectionTitle}>Your completed games</h2>
-          <p className={styles.sectionHint}>
-            Games you have finished can no longer be played, but you can replay
-            them turn by turn.
-          </p>
-          <ul className={styles.roomList}>
-            {completed.map((game) => (
-              <GameCard
-                key={game.id}
-                board={game.board}
-                name={game.name}
-                mode={game.mode}
-                onClick={() => router.push(`/replay/${game.id}`)}
-                badgeClass={`${styles.badge} ${game.winner ? styles[`badge_${game.winner === "X" ? "x" : "o"}`] : styles.badge_draw}`}
-                badgeLabel={resultLabel(game.winner)}
-              >
-                <div className={styles.completedFooter}>
-                  <span className={styles.replayHint}>▶ Replay</span>
-                  <span className={styles.completedTime}>
-                    {timeAgo(game.completedAt, Date.now())}
+          {roomsLoading && <Spinner label="Loading rooms…" />}
+
+          {Boolean(error) && !rooms && (
+            <p className={styles.loadError}>Could not load rooms. Retrying…</p>
+          )}
+
+          {rooms && rooms.length === 0 && (
+            <div className={styles.empty}>
+              <p className={styles.emptyTitle}>No rooms yet</p>
+              <p className={styles.emptyHint}>
+                Create the first room above to start playing.
+              </p>
+            </div>
+          )}
+
+          {rooms && rooms.length > 0 && pageRooms && (
+            <section className={styles.listSection}>
+              <h2 className={styles.sectionTitle}>Open rooms</h2>
+              <p className={styles.sectionHint}>
+                Join a live multiplayer room to play, or spectate a game in
+                progress.
+              </p>
+              <ul className={styles.roomList}>
+                {pageRooms.map((room) => (
+                  <GameCard
+                    key={room.id}
+                    board={room.board}
+                    name={room.name}
+                    mode={room.mode}
+                    onClick={() => router.push(`/room/${room.id}`)}
+                    badgeClass={`${styles.badge} ${styles[`badge_${room.status === "in-progress" ? "inProgress" : room.status}`]}`}
+                    badgeLabel={STATUS_LABEL[room.status]}
+                  >
+                    <div className={styles.seats}>
+                      <span className={room.seatsTaken.X ? styles.seatTaken : styles.seatOpen}>
+                        X {room.seatsTaken.X ? "taken" : "open"}
+                      </span>
+                      <span className={room.seatsTaken.O ? styles.seatTaken : styles.seatOpen}>
+                        O {room.seatsTaken.O ? "taken" : "open"}
+                      </span>
+                    </div>
+                  </GameCard>
+                ))}
+              </ul>
+
+              {totalPages > 1 && (
+                <nav className={styles.pagination} aria-label="Rooms pages">
+                  <button
+                    type="button"
+                    className={styles.pageButton}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={activePage === 0}
+                  >
+                    Previous
+                  </button>
+                  <span className={styles.pageStatus} aria-live="polite">
+                    Page {activePage + 1} of {totalPages}
                   </span>
-                </div>
-              </GameCard>
-            ))}
-          </ul>
-        </section>
-      )}
+                  <button
+                    type="button"
+                    className={styles.pageButton}
+                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                    disabled={activePage === totalPages - 1}
+                  >
+                    Next
+                  </button>
+                </nav>
+              )}
+            </section>
+          )}
+
+          {completed && completed.length > 0 && (
+            <section className={styles.listSection}>
+              <h2 className={styles.sectionTitle}>Your completed games</h2>
+              <p className={styles.sectionHint}>
+                Games you have finished can no longer be played, but you can
+                replay them turn by turn.
+              </p>
+              <ul className={styles.roomList}>
+                {completed.map((game) => (
+                  <GameCard
+                    key={game.id}
+                    board={game.board}
+                    name={game.name}
+                    mode={game.mode}
+                    onClick={() => router.push(`/replay/${game.id}`)}
+                    badgeClass={`${styles.badge} ${game.winner ? styles[`badge_${game.winner === "X" ? "x" : "o"}`] : styles.badge_draw}`}
+                    badgeLabel={resultLabel(game.winner)}
+                  >
+                    <div className={styles.completedFooter}>
+                      <span className={styles.replayHint}>▶ Replay</span>
+                      <span className={styles.completedTime}>
+                        {timeAgo(game.completedAt, Date.now())}
+                      </span>
+                    </div>
+                  </GameCard>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
+
+        {stats && stats.won + stats.lost + stats.drawn > 0 && (
+          <aside className={styles.statsPanel} aria-label="Your record">
+            <span className={styles.statsTitle}>Your record</span>
+            <dl className={styles.statsList}>
+              <div className={styles.statRow}>
+                <dt className={styles.statLabel}>Won</dt>
+                <dd className={`${styles.statValue} ${styles.statWon}`}>
+                  {stats.won}
+                </dd>
+              </div>
+              <div className={styles.statRow}>
+                <dt className={styles.statLabel}>Lost</dt>
+                <dd className={`${styles.statValue} ${styles.statLost}`}>
+                  {stats.lost}
+                </dd>
+              </div>
+              <div className={styles.statRow}>
+                <dt className={styles.statLabel}>Draw</dt>
+                <dd className={styles.statValue}>{stats.drawn}</dd>
+              </div>
+            </dl>
+          </aside>
+        )}
+      </div>
 
       <UIDialog
         isOpen={howToOpen}

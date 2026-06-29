@@ -410,7 +410,13 @@ async function withRoomTx(id: string, mutate: Mutator): Promise<StoreResult> {
 
 export async function listRooms(): Promise<RoomSummary[]> {
   await reapIdleRooms();
-  const rows = await prisma.room.findMany({ orderBy: { createdAt: "desc" } });
+  // Only online two-player rooms belong on the server and in the lobby list.
+  // Single-device modes (vs-AI, local) are client-only now; the filter also
+  // keeps any legacy ai/local rows left in the table from ever surfacing.
+  const rows = await prisma.room.findMany({
+    where: { mode: "two-player" },
+    orderBy: { createdAt: "desc" },
+  });
   return rows.map((row) => {
     const room = rowToRoom(row);
     // Sweep expired seats for the summary; the release is persisted lazily the
@@ -546,8 +552,14 @@ async function fetchCompletedGamesForPlayer(
   playerId: string,
 ): Promise<CompletedGame[]> {
   await reapIdleCompleted();
+  // Only two-player games are tracked. Single-device modes (vs-AI, local) are
+  // client-only and never archived; the mode filter also stops any legacy
+  // ai/local rows from being listed or counted in the player's record.
   const rows = await prisma.completedGame.findMany({
-    where: { OR: [{ playerX: playerId }, { playerO: playerId }] },
+    where: {
+      mode: "two-player",
+      OR: [{ playerX: playerId }, { playerO: playerId }],
+    },
     orderBy: { completedAt: "desc" },
   });
   return rows.map(rowToCompleted);
