@@ -44,6 +44,70 @@ const ARROW_DIR_CLASS: Record<Direction, string> = {
   right: styles.arrowRight,
 };
 
+/**
+ * The transport bar under the board: jump-to-start, previous, play/pause,
+ * next, jump-to-end. Pure presentation - it owns no state, just reflects the
+ * current step and fires the parent's `goTo`/`togglePlay` handlers, so the main
+ * render stays focused on deriving the board position.
+ */
+const ReplayControls = (props: {
+  step: number;
+  total: number;
+  playing: boolean;
+  atStart: boolean;
+  atEnd: boolean;
+  goTo: (next: number) => void;
+  togglePlay: () => void;
+}) => (
+  <div className={styles.controls} role="group" aria-label="Replay controls">
+    <button
+      type="button"
+      className={styles.controlButton}
+      onClick={() => props.goTo(0)}
+      disabled={props.atStart}
+      aria-label="Jump to start"
+    >
+      ⏮
+    </button>
+    <button
+      type="button"
+      className={styles.controlButton}
+      onClick={() => props.goTo(props.step - 1)}
+      disabled={props.atStart}
+      aria-label="Previous move"
+    >
+      ◀
+    </button>
+    <button
+      type="button"
+      className={styles.playButton}
+      onClick={props.togglePlay}
+      disabled={props.total === 0}
+      aria-label={props.playing ? "Pause" : "Play"}
+    >
+      {props.playing ? "Pause" : props.atEnd ? "Replay" : "Play"}
+    </button>
+    <button
+      type="button"
+      className={styles.controlButton}
+      onClick={() => props.goTo(props.step + 1)}
+      disabled={props.atEnd}
+      aria-label="Next move"
+    >
+      ▶
+    </button>
+    <button
+      type="button"
+      className={styles.controlButton}
+      onClick={() => props.goTo(props.total)}
+      disabled={props.atEnd}
+      aria-label="Jump to end"
+    >
+      ⏭
+    </button>
+  </div>
+);
+
 const Replay = (props: Props) => {
   // Number of moves shown so far: 0 is the empty board, moves.length is final.
   const [step, setStep] = useState(0);
@@ -217,57 +281,15 @@ const Replay = (props: Props) => {
           : "Start of game"}
       </p>
 
-      <div
-        className={styles.controls}
-        role="group"
-        aria-label="Replay controls"
-      >
-        <button
-          type="button"
-          className={styles.controlButton}
-          onClick={() => goTo(0)}
-          disabled={atStart}
-          aria-label="Jump to start"
-        >
-          ⏮
-        </button>
-        <button
-          type="button"
-          className={styles.controlButton}
-          onClick={() => goTo(step - 1)}
-          disabled={atStart}
-          aria-label="Previous move"
-        >
-          ◀
-        </button>
-        <button
-          type="button"
-          className={styles.playButton}
-          onClick={togglePlay}
-          disabled={total === 0}
-          aria-label={playing ? "Pause" : "Play"}
-        >
-          {playing ? "Pause" : atEnd ? "Replay" : "Play"}
-        </button>
-        <button
-          type="button"
-          className={styles.controlButton}
-          onClick={() => goTo(step + 1)}
-          disabled={atEnd}
-          aria-label="Next move"
-        >
-          ▶
-        </button>
-        <button
-          type="button"
-          className={styles.controlButton}
-          onClick={() => goTo(total)}
-          disabled={atEnd}
-          aria-label="Jump to end"
-        >
-          ⏭
-        </button>
-      </div>
+      <ReplayControls
+        step={step}
+        total={total}
+        playing={playing}
+        atStart={atStart}
+        atEnd={atEnd}
+        goTo={goTo}
+        togglePlay={togglePlay}
+      />
     </div>
   );
 };
