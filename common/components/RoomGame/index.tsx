@@ -296,6 +296,11 @@ const RoomGame = (props: Props) => {
         </div>
 
         <aside className={styles.infoPanel}>
+          {/* Always available: copies a shareable link to this room so the
+              player can hand it to someone to join (or spectate). Sits at the
+              top of the player column, above the seat info. */}
+          <InviteButton roomId={props.id} />
+
           <div
             className={classNames(styles.infoRow, {
               [styles.infoRowActive]: turnActive("X"),
@@ -337,11 +342,6 @@ const RoomGame = (props: Props) => {
 
             {canShiftNow && mySeat === "O" && shiftControls}
           </div>
-
-          {/* Always available: copies a shareable link to this room so the
-              player can hand it to someone to join (or spectate). Lives at the
-              foot of the player column alongside the seat info. */}
-          <InviteButton roomId={props.id} />
         </aside>
       </div>
 
