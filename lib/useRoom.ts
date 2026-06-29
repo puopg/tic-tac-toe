@@ -312,23 +312,30 @@ export function useRoom(id: string, opts: UseRoomOptions): UseRoomResult {
   });
 
   // Best-effort instant seat release: on tab close via `pagehide`, and on
-  // in-app navigation (unmount) via the cleanup. The 30s TTL is the backstop.
-  useEffect(() => {
+  // in-app navigation (unmount) via the cleanup. The latest seat/player is read
+  // through a ref so this effect mounts only once and its cleanup runs solely on
+  // a real unmount. Keeping `mySeat` out of the deps is essential: a
+  // between-rounds seat swap (see swapSeats) flips `mySeat` from X to O, and if
+  // that re-ran the effect its cleanup `release()` would fire a stray DELETE and
+  // boot the player from the seat they actually kept. The 30s TTL is the backstop.
+  const releaseSeatRef = useRef<() => void>(() => {});
+  releaseSeatRef.current = () => {
     if (!playerId || !mySeat) return;
-    const release = () => {
-      fetch(`/api/rooms/${id}/seat`, {
-        method: "DELETE",
-        keepalive: true,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId }),
-      }).catch(() => {});
-    };
+    fetch(`/api/rooms/${id}/seat`, {
+      method: "DELETE",
+      keepalive: true,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerId }),
+    }).catch(() => {});
+  };
+  useEffect(() => {
+    const release = () => releaseSeatRef.current();
     window.addEventListener("pagehide", release);
     return () => {
       window.removeEventListener("pagehide", release);
       release();
     };
-  }, [id, playerId, mySeat]);
+  }, []);
 
   const currentTurn: Player = room?.xIsNext ? "X" : "O";
   const gameOver = room?.status === "finished";
