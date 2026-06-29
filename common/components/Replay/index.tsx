@@ -169,7 +169,12 @@ const Replay = (props: Props) => {
 
   return (
     <div className={styles.root}>
-      <RoomHeader name={game.name} mode={game.mode} />
+      <RoomHeader
+        name={game.name}
+        mode={game.mode}
+        size={game.size}
+        winLength={game.winLength}
+      />
 
       <p className={styles.replayTag}>Replay · read-only</p>
 

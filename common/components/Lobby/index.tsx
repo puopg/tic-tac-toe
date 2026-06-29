@@ -104,6 +104,10 @@ const Lobby = () => {
     queryFn: ({ signal }) => fetchGameConfig(signal),
   });
   const activeShiftMode: ShiftMode = gameConfig?.shiftMode ?? "classic";
+  // Reflect the size/win run new games are created at, so the dialog's rules and
+  // the abilities it explains match what the player is about to play.
+  const activeSize = gameConfig?.boardSize ?? 3;
+  const activeWinLength = gameConfig?.winLength ?? 3;
 
   const createMutation = useMutation({
     mutationFn: (vars: { name: string; mode: RoomMode }) =>
@@ -313,53 +317,22 @@ const Lobby = () => {
         isOpen={howToOpen}
         close={() => setHowToOpen(false)}
         title="How to play"
-        description="Tic-tac-toe, with a twist for player O."
+        description="Tic tac toe - but with a twist!"
       >
         <p className={styles.howToParagraph}>
-          The board is a 3x3 grid. Player X always moves first and player O
-          moves second; you take turns placing your mark, and the first to line
-          up three in a row - across, down, or diagonally - wins.
+          X moves first, O second - take turns
+          placing marks, and the first to line up {activeWinLength} in a row
+          (across, down, or diagonally) wins.
         </p>
-        {activeShiftMode === "collapse" ? (
-          <>
-            <p className={styles.howToParagraph}>
-              To balance going second, player O gets one special ability: a
-              once-per-game <strong>grid collapse</strong>. On O&apos;s turn,
-              instead of placing a mark, O can collapse the whole grid - up,
-              down, left, or right. Each row or column collapses toward the edge
-              it moves toward.
-            </p>
-            <p className={styles.howToParagraph}>
-              Reading inward from that edge, the leading run of matching marks is
-              swept off the board and the first mark that differs settles against
-              the edge - the rest of that line is cleared. The collapse uses up
-              O&apos;s turn, and because a mark can line up, a collapse
-              <em> can</em> complete three in a row and win on the spot.
-            </p>
-          </>
-        ) : (
-          <>
-            <p className={styles.howToParagraph}>
-              To balance going second, player O gets one special ability: a
-              once-per-game <strong>grid shift</strong>. On O&apos;s turn,
-              instead of placing a mark, O can slide the whole grid one cell -
-              up, down, left, or right. Any marks pushed off the leading edge
-              fall off the board and are removed.
-            </p>
-            <p className={styles.howToParagraph}>
-              The shift uses up O&apos;s turn, so players still alternate
-              strictly, and O only gets it once per game. A shift only
-              translates marks, so it can never complete a line and never wins
-              on its own - it is purely O&apos;s compensation for moving second.
-            </p>
-          </>
-        )}
         <p className={styles.howToParagraph}>
-          On larger boards, player X also earns a one-time{" "}
-          <strong>grid shift</strong> partway through the game - always the
-          classic slide - to use on its turn just like O.
+          The twist: once per game, instead of placing a mark, O can reshape the
+          whole board with <strong>Grid Collapse</strong>:
         </p>
         <ShiftAnimation mode={activeShiftMode} />
+        <p className={styles.howToParagraph} style={{ marginTop: 24 }}>
+          On larger boards, Player X also gets the ability to shift the board in
+          any direction by 1.
+        </p>
       </UIDialog>
     </div>
   );

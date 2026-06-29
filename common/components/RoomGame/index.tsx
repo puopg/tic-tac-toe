@@ -197,7 +197,12 @@ const RoomGame = (props: Props) => {
         </div>
       )}
 
-      <RoomHeader name={room.name} mode={room.mode} />
+      <RoomHeader
+        name={room.name}
+        mode={room.mode}
+        size={room.size}
+        winLength={room.winLength}
+      />
 
       <Status message={status.message} tone={status.tone} />
 

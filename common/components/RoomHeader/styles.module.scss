@@ -36,3 +36,15 @@
   border-radius: 999px;
   white-space: nowrap;
 }
+
+// The locked-in win condition, accent-tinted to read as a distinct rules badge
+// beside the muted mode tag.
+.rulesTag {
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--surface);
+  border-radius: 999px;
+  white-space: nowrap;
+}
