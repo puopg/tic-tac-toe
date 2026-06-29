@@ -281,6 +281,43 @@ const useReplayPlayer = (id: string) => {
   };
 };
 
+/**
+ * Derives the render-ready view-model for the move currently scrubbed to from
+ * the immutable game and the transport `step`. Pure - it groups the board
+ * snapshot, winning line, transport-edge flags, the just-shown action (narrated
+ * below the board), and the spectator status line so the main component's body
+ * stays load-guards + JSX with no inline derivation.
+ */
+const deriveReplayView = (args: {
+  game: CompletedGameView;
+  step: number;
+  total: number;
+}) => {
+  const { game, step, total } = args;
+
+  const board = boardAfterActions(game.actions, step, game.size);
+  const result = calculateWinner(board, game.winLength);
+  const atEnd = step === total;
+  // The action just shown, narrated below the board (e.g. "O shifted the grid
+  // down") so a shift turn reads as a deliberate move rather than a skipped one.
+  const lastAction = step > 0 ? game.actions[step - 1] : null;
+
+  const status = spectatorStatus(
+    result ? result.winner : null,
+    step % 2 === 0 ? "X" : "O",
+    atEnd,
+  );
+
+  return {
+    board,
+    winningLine: result ? result.line : null,
+    atStart: step === 0,
+    atEnd,
+    lastAction,
+    status,
+  };
+};
+
 const Replay = (props: Props) => {
   const {
     game,
@@ -312,19 +349,8 @@ const Replay = (props: Props) => {
     );
   }
 
-  const board = boardAfterActions(game.actions, step, game.size);
-  const result = calculateWinner(board, game.winLength);
-  const atStart = step === 0;
-  const atEnd = step === total;
-  // The action just shown, narrated below the board (e.g. "O shifted the grid
-  // down") so a shift turn reads as a deliberate move rather than a skipped one.
-  const lastAction = step > 0 ? game.actions[step - 1] : null;
-
-  const { message: statusMessage, tone: statusTone } = spectatorStatus(
-    result ? result.winner : null,
-    step % 2 === 0 ? "X" : "O",
-    atEnd,
-  );
+  const { board, winningLine, atStart, atEnd, lastAction, status } =
+    deriveReplayView({ game, step, total });
 
   return (
     <div className={styles.root}>
@@ -337,11 +363,11 @@ const Replay = (props: Props) => {
 
       <p className={styles.replayTag}>Replay · read-only</p>
 
-      <Status message={statusMessage} tone={statusTone} />
+      <Status message={status.message} tone={status.tone} />
 
       <ReplayBoard
         board={board}
-        winningLine={result ? result.line : null}
+        winningLine={winningLine}
         transition={transition}
         arrowDir={arrowDir}
       />
