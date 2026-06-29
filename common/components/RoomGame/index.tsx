@@ -197,12 +197,7 @@ const RoomGame = (props: Props) => {
         </div>
       )}
 
-      <RoomHeader
-        name={room.name}
-        mode={room.mode}
-        size={room.size}
-        winLength={room.winLength}
-      />
+      <RoomHeader name={room.name} mode={room.mode} />
 
       <Status message={status.message} tone={status.tone} />
 
@@ -295,6 +290,10 @@ const RoomGame = (props: Props) => {
         </div>
 
         <aside className={styles.infoPanel}>
+          <span className={styles.winCondition}>
+            {room.winLength} in a row
+          </span>
+
           <div
             className={classNames(styles.infoRow, {
               [styles.infoRowActive]: turnActive("X"),
