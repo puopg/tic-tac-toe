@@ -1,8 +1,8 @@
-// Shares the seat-bar button footprint (full-width, same padding/radius) so it
-// sits flush beside the seat-claim / leave buttons. Accent-tinted to read as a
-// share action; the copied state swaps to a solid success-ish accent fill.
+// Sits at the foot of the player-info column, spanning its full width so it
+// lines up with the X / O rows above it. Accent-tinted to read as a share
+// action; the copied state swaps to a solid success-ish accent fill.
 .root {
-  flex: 1;
+  width: 100%;
   padding: 10px 14px;
   font-size: 0.85rem;
   font-weight: 700;

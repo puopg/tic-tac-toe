@@ -244,9 +244,6 @@ const RoomGame = (props: Props) => {
             )}
           </>
         )}
-        {/* Always available: copies a shareable link to this room so the player
-            can hand it to someone to join (or spectate). */}
-        <InviteButton roomId={props.id} />
       </div>
 
       <div className={styles.playArea}>
@@ -340,6 +337,11 @@ const RoomGame = (props: Props) => {
 
             {canShiftNow && mySeat === "O" && shiftControls}
           </div>
+
+          {/* Always available: copies a shareable link to this room so the
+              player can hand it to someone to join (or spectate). Lives at the
+              foot of the player column alongside the seat info. */}
+          <InviteButton roomId={props.id} />
         </aside>
       </div>
 
