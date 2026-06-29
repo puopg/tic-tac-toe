@@ -184,10 +184,26 @@ export function useRoom(id: string, opts: UseRoomOptions): UseRoomResult {
 
   const mySeat: Player | null = useMemo(() => {
     if (!room || !playerId) return null;
-    if (room.seats.X === playerId) return "X";
-    if (room.seats.O === playerId) return "O";
+    const holdsX = room.seats.X === playerId;
+    const holdsO = room.seats.O === playerId;
+    // Same-device (local) play: one player holds both seats and moves for each
+    // side in turn, so the seat they are acting as is simply whoever is on turn.
+    // Every consumer (board enablement, optimistic mark, shift ownership) keys
+    // off mySeat, so tracking the on-turn seat makes pass-and-play just work.
+    if (holdsX && holdsO) return room.xIsNext ? "X" : "O";
+    if (holdsX) return "X";
+    if (holdsO) return "O";
     return null;
   }, [room, playerId]);
+
+  // Whether this player holds any seat in the room. Unlike `mySeat` - which in a
+  // local room tracks the on-turn side and so flips X<->O every turn - this stays
+  // stable while seated, so effects keyed on "am I seated" (seat release) don't
+  // re-fire on every turn.
+  const amSeated =
+    !!room &&
+    !!playerId &&
+    (room.seats.X === playerId || room.seats.O === playerId);
 
   // Pause polling and abort any in-flight GET before a local write begins, so a
   // stale response can't land after our optimistic/authoritative update.
@@ -314,10 +330,11 @@ export function useRoom(id: string, opts: UseRoomOptions): UseRoomResult {
   // Best-effort instant seat release: on tab close via `pagehide`, and on
   // in-app navigation (unmount) via the cleanup. The latest seat/player is read
   // through a ref so this effect mounts only once and its cleanup runs solely on
-  // a real unmount. Keeping `mySeat` out of the deps is essential: a
-  // between-rounds seat swap (see swapSeats) flips `mySeat` from X to O, and if
+  // a real unmount. Keeping `mySeat` out of the deps is essential: `mySeat`
+  // flips X<->O whenever the on-turn side changes - between rounds via a seat
+  // swap (see swapSeats), and every turn in a local pass-and-play room - and if
   // that re-ran the effect its cleanup `release()` would fire a stray DELETE and
-  // boot the player from the seat they actually kept. The 30s TTL is the backstop.
+  // boot the player from a seat they actually kept. The 30s TTL is the backstop.
   const releaseSeatRef = useRef<() => void>(() => {});
   releaseSeatRef.current = () => {
     if (!playerId || !mySeat) return;
@@ -386,10 +403,10 @@ export function useRoom(id: string, opts: UseRoomOptions): UseRoomResult {
   // remaining delay. That GET runs `getRoom(id, playerId)`, which re-evaluates
   // the server-side guard; the client only asks the server to decide, so
   // authority stays on the server and the nudge is idempotent and harmless if
-  // the room has already reset. Gated on `mySeat` so spectators don't all nudge
+  // the room has already reset. Gated on `amSeated` so spectators don't all nudge
   // at once - they are covered by the 1s stream tick.
   useEffect(() => {
-    if (room?.status !== "finished" || !playerId || !mySeat) return;
+    if (room?.status !== "finished" || !playerId || !amSeated) return;
     const elapsed = Date.now() - room.lastActivity;
     const remaining = Math.max(0, AUTO_RESET_MS - elapsed);
     const timer = setTimeout(() => {
@@ -398,7 +415,7 @@ export function useRoom(id: string, opts: UseRoomOptions): UseRoomResult {
         .catch(() => {});
     }, remaining);
     return () => clearTimeout(timer);
-  }, [room?.status, room?.lastActivity, id, mySeat, playerId, setRoom]);
+  }, [room?.status, room?.lastActivity, id, amSeated, playerId, setRoom]);
 
   // Disarm the shift picker whenever the viewer can no longer shift (turn passed,
   // shift spent or not yet earned, game ended, seat left), so it never lingers
@@ -450,16 +467,25 @@ export function useRoom(id: string, opts: UseRoomOptions): UseRoomResult {
   // (read live via a ref so the effect can depend only on the count) and flash a
   // banner with it. The ref seeds on first load so joining mid-game doesn't flash
   // it, and only a shrink from a non-empty log counts, so the opening round - which
-  // has no swap to announce - stays silent.
+  // has no swap to announce - stays silent. Local same-device rooms never swap
+  // seats (one player plays both sides), so there is no first/second to announce.
   const [roundAnnouncement, setRoundAnnouncement] = useState<Player | null>(null);
   const mySeatRef = useRef(mySeat);
   mySeatRef.current = mySeat;
+  const isLocalRef = useRef(room?.mode === "local");
+  isLocalRef.current = room?.mode === "local";
   const prevRoundActionsRef = useRef<number | null>(null);
   useEffect(() => {
     if (actionCount === null) return;
     const prev = prevRoundActionsRef.current;
     prevRoundActionsRef.current = actionCount;
-    if (prev !== null && prev > 0 && actionCount === 0 && mySeatRef.current) {
+    if (
+      prev !== null &&
+      prev > 0 &&
+      actionCount === 0 &&
+      mySeatRef.current &&
+      !isLocalRef.current
+    ) {
       setRoundAnnouncement(mySeatRef.current);
     }
   }, [actionCount]);

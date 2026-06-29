@@ -241,6 +241,77 @@ describe("AI seating and follow-up", () => {
   });
 });
 
+describe("local same-device mode", () => {
+  it("gives both seats to the one player who claims a local room", async () => {
+    const created = await createRoom("local room", "local");
+    if (!created.ok) throw new Error("room creation failed");
+    const id = created.room.id;
+    expect((await claimSeat(id, "X", PX)).ok).toBe(true);
+
+    const room = await getRoom(id);
+    expect(room?.seats).toEqual({ X: PX, O: PX }); // same player holds both sides
+  });
+
+  it("lets the one seated player move for both X and O", async () => {
+    const created = await createRoom("local room", "local");
+    if (!created.ok) throw new Error("room creation failed");
+    const id = created.room.id;
+    expect((await claimSeat(id, "O", PX)).ok).toBe(true); // either side claims both
+
+    expect((await makeMove(id, 0, PX)).ok).toBe(true); // X's turn
+    expect((await makeMove(id, 3, PX)).ok).toBe(true); // O's turn, same player
+    expect((await makeMove(id, 1, PX)).ok).toBe(true); // X again
+
+    const room = await getRoom(id);
+    expect(room?.board[0]).toBe("X");
+    expect(room?.board[3]).toBe("O");
+    expect(room?.board[1]).toBe("X");
+    // No AI ever replies in a local room: only the human's three marks are down.
+    expect(room?.actions).toHaveLength(3);
+  });
+
+  it("keeps both seats and per-seat scores stable across a reset (no swap)", async () => {
+    const created = await createRoom("local room", "local");
+    if (!created.ok) throw new Error("room creation failed");
+    const id = created.room.id;
+    expect((await claimSeat(id, "X", PX)).ok).toBe(true);
+
+    // The one player plays both sides to an X win on the top row.
+    expect((await makeMove(id, 0, PX)).ok).toBe(true); // X
+    expect((await makeMove(id, 3, PX)).ok).toBe(true); // O
+    expect((await makeMove(id, 1, PX)).ok).toBe(true); // X
+    expect((await makeMove(id, 4, PX)).ok).toBe(true); // O
+    expect((await makeMove(id, 2, PX)).ok).toBe(true); // X wins top row
+    const won = await getRoom(id);
+    expect(won?.scores).toEqual({ X: 1, O: 0, draws: 0 });
+
+    // Age the finished game past the reset delay, then heartbeat to heal it.
+    await prisma.room.update({
+      where: { id },
+      data: { lastActivity: new Date(Date.now() - AUTO_RESET_MS - 1000) },
+    });
+    const room = await getRoom(id, PX); // the player's heartbeat heals it
+    expect(room?.seats).toEqual({ X: PX, O: PX }); // seats never swap in local mode
+    expect(room?.xIsNext).toBe(true); // fresh round, X opens
+    expect(room?.actions).toHaveLength(0);
+    expect(room?.scores).toEqual({ X: 1, O: 0, draws: 0 }); // X's win stayed on X
+  });
+
+  it("clears the round and scores when the sole player leaves", async () => {
+    const created = await createRoom("local room", "local");
+    if (!created.ok) throw new Error("room creation failed");
+    const id = created.room.id;
+    expect((await claimSeat(id, "X", PX)).ok).toBe(true);
+    expect((await makeMove(id, 0, PX)).ok).toBe(true);
+    expect((await leaveSeat(id, PX)).ok).toBe(true);
+
+    const room = await getRoom(id);
+    expect(room?.seats).toEqual({ X: null, O: null }); // both freed
+    expect(room?.board.every((cell) => cell === null)).toBe(true);
+    expect(room?.scores).toEqual({ X: 0, O: 0, draws: 0 });
+  });
+});
+
 describe("scoring and completed-game archival on settle", () => {
   it("scores a win once and archives the finished game", async () => {
     const { id } = await seatedRoom();

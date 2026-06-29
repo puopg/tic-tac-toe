@@ -1,6 +1,6 @@
 import type { Board, GameAction, Player } from "@/utils/gameLogic";
 
-export type RoomMode = "two-player" | "ai";
+export type RoomMode = "two-player" | "ai" | "local";
 export type RoomStatus = "waiting" | "in-progress" | "finished";
 
 /** Each seat holds a playerId, the sentinel "__AI__", or null when open. */
@@ -125,5 +125,12 @@ export interface CompletedGameView {
 
 /** Short human-readable label for a room's mode. */
 export function modeLabel(mode: RoomMode): string {
-  return mode === "ai" ? "vs AI" : "2 Player";
+  switch (mode) {
+    case "ai":
+      return "vs AI";
+    case "local":
+      return "Local 2P";
+    default:
+      return "2 Player";
+  }
 }
