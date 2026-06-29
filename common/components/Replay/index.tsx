@@ -108,6 +108,67 @@ const ReplayControls = (props: {
   </div>
 );
 
+/**
+ * The replay board plus its shift-cue overlay. The board itself plays the move
+ * motion via `transition`; this adds the directional arrow that flashes over the
+ * grid during a shift cue (`arrowDir`, faded out on a timer by the parent). Pure
+ * presentation - read-only, so square clicks are inert.
+ */
+const ReplayBoard = (props: {
+  board: ReturnType<typeof boardAfterActions>;
+  winningLine: readonly number[] | null;
+  transition: BoardTransition | null;
+  arrowDir: Direction | null;
+}) => (
+  <div className={styles.boardWrap}>
+    <Board
+      board={props.board}
+      winningLine={props.winningLine}
+      onSquareClick={() => {}}
+      disabled
+      transition={props.transition}
+    />
+
+    {props.arrowDir && (
+      <div
+        className={classNames(styles.shiftArrow, ARROW_DIR_CLASS[props.arrowDir])}
+        aria-hidden="true"
+      >
+        <IoArrowForward className={styles.shiftArrowIcon} />
+      </div>
+    )}
+  </div>
+);
+
+/**
+ * The narration shown below the board: the "Turn N / total" progress counter and
+ * the sentence describing the move just shown (or "Start of game" at step 0). A
+ * shift move gets a distinct caption style; `aria-live` announces each change.
+ */
+const MoveNarration = (props: {
+  step: number;
+  total: number;
+  lastAction: CompletedGameView["actions"][number] | null;
+  size: number;
+}) => (
+  <>
+    <div className={styles.progress}>
+      Turn {props.step} / {props.total}
+    </div>
+
+    <p
+      className={classNames(styles.moveCaption, {
+        [styles.moveCaptionShift]: props.lastAction?.kind === "shift",
+      })}
+      aria-live="polite"
+    >
+      {props.lastAction
+        ? actionSentence(props.lastAction, props.step - 1, props.size)
+        : "Start of game"}
+    </p>
+  </>
+);
+
 const Replay = (props: Props) => {
   // Number of moves shown so far: 0 is the empty board, moves.length is final.
   const [step, setStep] = useState(0);
@@ -244,42 +305,19 @@ const Replay = (props: Props) => {
 
       <Status message={statusMessage} tone={statusTone} />
 
-      <div className={styles.boardWrap}>
-        <Board
-          board={board}
-          winningLine={result ? result.line : null}
-          onSquareClick={() => {}}
-          disabled
-          transition={transition}
-        />
+      <ReplayBoard
+        board={board}
+        winningLine={result ? result.line : null}
+        transition={transition}
+        arrowDir={arrowDir}
+      />
 
-        {arrowDir && (
-          <div
-            className={classNames(
-              styles.shiftArrow,
-              ARROW_DIR_CLASS[arrowDir],
-            )}
-            aria-hidden="true"
-          >
-            <IoArrowForward className={styles.shiftArrowIcon} />
-          </div>
-        )}
-      </div>
-
-      <div className={styles.progress}>
-        Turn {step} / {total}
-      </div>
-
-      <p
-        className={classNames(styles.moveCaption, {
-          [styles.moveCaptionShift]: lastAction?.kind === "shift",
-        })}
-        aria-live="polite"
-      >
-        {lastAction
-          ? actionSentence(lastAction, step - 1, game.size)
-          : "Start of game"}
-      </p>
+      <MoveNarration
+        step={step}
+        total={total}
+        lastAction={lastAction}
+        size={game.size}
+      />
 
       <ReplayControls
         step={step}
