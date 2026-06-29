@@ -13,8 +13,8 @@ type SceneMark = {
   row: number;
   col: number;
   // Where the mark ends up after the shift fires: a destination column, or
-  // "fall" - the classic case where a mark is pushed off the leading edge.
-  // (Collapse never pushes a mark off, so it only ever uses column destinations.)
+  // "fall" - a mark pushed off the leading edge (classic edge marks, or a
+  // collapse's leading run that matches the edge value).
   to: number | "fall";
 };
 
@@ -39,17 +39,23 @@ const SCENES: Record<ShiftMode, Scene> = {
       { id: "x-br", player: "X", row: 2, col: 2, to: "fall" },
     ],
   },
-  // Collapse: each row shifts toward the leading (right) edge until the edge
-  // value changes, shedding the leading run that matches it. Row 0's two X match
-  // the X on the edge, so they fall off and the trailing O settles at the wall;
-  // row 1's lone O slides across the empty row to the wall, losing nothing.
+  // Collapse: each row shifts toward the leading (right) edge, shedding the
+  // leading run of marks that match the edge value and packing the rest against
+  // the wall. This is a real board - `O X X / X O . / O . X` collapsed right
+  // becomes `. . O / . X O / . O .`, chosen so every behaviour shows at once:
+  // row 0's two edge X sweep off and the O behind them packs to the wall, row
+  // 1's X survives while its O packs in, and row 2's lone edge X sweeps off
+  // while its O slides one cell in behind it.
   collapse: {
     caption: "Grid collapse: O slides consecutive marks off the edge",
     marks: [
-      { id: "c-o-settle", player: "O", row: 0, col: 0, to: 2 },
-      { id: "c-x-fall-a", player: "X", row: 0, col: 1, to: "fall" },
-      { id: "c-x-fall-b", player: "X", row: 0, col: 2, to: "fall" },
-      { id: "c-o-slide", player: "O", row: 1, col: 0, to: 2 },
+      { id: "c-o0", player: "O", row: 0, col: 0, to: 2 },
+      { id: "c-x0a", player: "X", row: 0, col: 1, to: "fall" },
+      { id: "c-x0b", player: "X", row: 0, col: 2, to: "fall" },
+      { id: "c-x1", player: "X", row: 1, col: 0, to: 1 },
+      { id: "c-o1", player: "O", row: 1, col: 1, to: 2 },
+      { id: "c-o2", player: "O", row: 2, col: 0, to: 1 },
+      { id: "c-x2", player: "X", row: 2, col: 2, to: "fall" },
     ],
   },
 };
