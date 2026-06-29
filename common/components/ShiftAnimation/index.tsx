@@ -5,6 +5,7 @@ import classNames from "classnames";
 import { IoArrowForward } from "react-icons/io5";
 import { INITIAL_SIZE } from "@/constants/game";
 import { DEFAULT_SHIFT_MODE, type ShiftMode } from "@/utils/gameLogic";
+import { useReducedMotion } from "@/lib/useReducedMotion";
 import styles from "./styles.module.scss";
 
 type SceneMark = {
@@ -106,21 +107,13 @@ const SceneMarkView = (props: { mark: SceneMark; shifted: boolean }) => {
  * Honours `prefers-reduced-motion` by holding the starting board still.
  */
 const ShiftAnimation = ({ mode = DEFAULT_SHIFT_MODE }: { mode?: ShiftMode }) => {
-  const [reducedMotion, setReducedMotion] = useState(false);
+  const reducedMotion = useReducedMotion();
   const [shifted, setShifted] = useState(false);
   // Bumped each loop and used as a remount key so the scene resets to its start
   // state without playing every transition in reverse.
   const [cycle, setCycle] = useState(0);
 
   const scene = SCENES[mode] ?? SCENES[DEFAULT_SHIFT_MODE];
-
-  useEffect(() => {
-    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReducedMotion(mql.matches);
-    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, []);
 
   useEffect(() => {
     if (reducedMotion) return;

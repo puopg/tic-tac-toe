@@ -20,6 +20,7 @@ import {
 } from "@/utils/gameLogic";
 import Square from "@/common/components/Square";
 import WinningLine from "@/common/components/WinningLine";
+import { useReducedMotion } from "@/lib/useReducedMotion";
 import styles from "./styles.module.scss";
 
 /** Board grid gap in px; keep in sync with `gap` in styles.module.scss. */
@@ -273,14 +274,7 @@ const Board = (props: Props) => {
     return () => observer.disconnect();
   }, [size]);
 
-  const [reducedMotion, setReducedMotion] = useState(false);
-  useEffect(() => {
-    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReducedMotion(mql.matches);
-    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, []);
+  const reducedMotion = useReducedMotion();
 
   // Reconcile the sprite list during render (a derived-state pattern): a fresh
   // transition animates the change, any other board change snaps. Guarded by the
