@@ -540,6 +540,17 @@ export function toCompletedView(game: CompletedGame): CompletedGameView {
   };
 }
 
+async function fetchCompletedGamesForPlayer(
+  playerId: string,
+): Promise<CompletedGame[]> {
+  await reapIdleCompleted();
+  const rows = await prisma.completedGame.findMany({
+    where: { OR: [{ playerX: playerId }, { playerO: playerId }] },
+    orderBy: { completedAt: "desc" },
+  });
+  return rows.map(rowToCompleted);
+}
+
 /**
  * Archived finished games the given player took part in, newest first. Scoped to
  * a player so each browser only sees its own games; a request without a player id
@@ -549,12 +560,8 @@ export async function listCompletedGames(
   playerId: string,
 ): Promise<CompletedGameSummary[]> {
   if (!playerId) return [];
-  await reapIdleCompleted();
-  const rows = await prisma.completedGame.findMany({
-    where: { OR: [{ playerX: playerId }, { playerO: playerId }] },
-    orderBy: { completedAt: "desc" },
-  });
-  return rows.map((row) => toCompletedSummary(rowToCompleted(row)));
+  const games = await fetchCompletedGamesForPlayer(playerId);
+  return games.map(toCompletedSummary);
 }
 
 /**
@@ -568,19 +575,14 @@ export async function listCompletedGames(
 export async function getPlayerStats(playerId: string): Promise<PlayerStats> {
   const stats: PlayerStats = { won: 0, lost: 0, drawn: 0 };
   if (!playerId) return stats;
-  await reapIdleCompleted();
-  const rows = await prisma.completedGame.findMany({
-    where: { OR: [{ playerX: playerId }, { playerO: playerId }] },
-  });
-  for (const row of rows) {
-    const game = rowToCompleted(row);
+  const games = await fetchCompletedGamesForPlayer(playerId);
+  for (const game of games) {
     const board = boardAfterActions(game.actions, game.actions.length, game.size);
     const result = calculateWinner(board, game.winLength);
     if (!result) {
       stats.drawn += 1;
       continue;
     }
-    // The query guarantees this player held one of the two seats this game.
     const seat: Player = game.playerX === playerId ? "X" : "O";
     if (result.winner === seat) stats.won += 1;
     else stats.lost += 1;
