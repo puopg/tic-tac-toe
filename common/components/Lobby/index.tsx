@@ -79,6 +79,63 @@ const GameCard = (props: {
   </li>
 );
 
+/** This browser's lifetime win/loss/draw tally, shown beside the room lists. */
+const RecordPanel = (props: { stats: PlayerStats }) => (
+  <aside className={styles.statsPanel} aria-label="Your record">
+    <span className={styles.statsTitle}>Your record</span>
+    <dl className={styles.statsList}>
+      <div className={styles.statRow}>
+        <dt className={styles.statLabel}>Won</dt>
+        <dd className={`${styles.statValue} ${styles.statWon}`}>
+          {props.stats.won}
+        </dd>
+      </div>
+      <div className={styles.statRow}>
+        <dt className={styles.statLabel}>Lost</dt>
+        <dd className={`${styles.statValue} ${styles.statLost}`}>
+          {props.stats.lost}
+        </dd>
+      </div>
+      <div className={styles.statRow}>
+        <dt className={styles.statLabel}>Draw</dt>
+        <dd className={styles.statValue}>{props.stats.drawn}</dd>
+      </div>
+    </dl>
+  </aside>
+);
+
+/**
+ * The "How to play" modal: explains the rules and animates the shift variant
+ * that new games are currently created with, so it matches the active config.
+ */
+const HowToPlayDialog = (props: {
+  isOpen: boolean;
+  close: () => void;
+  winLength: number;
+  shiftMode: ShiftMode;
+}) => (
+  <UIDialog
+    isOpen={props.isOpen}
+    close={props.close}
+    title="How to play"
+    description="Tic tac toe - but with a twist!"
+  >
+    <p className={styles.howToParagraph}>
+      X moves first, O second - take turns placing marks, and the first to line
+      up {props.winLength} in a row (across, down, or diagonally) wins.
+    </p>
+    <p className={styles.howToParagraph}>
+      The twist: once per game, instead of placing a mark, O can reshape the
+      whole board with <strong>Grid Collapse</strong>:
+    </p>
+    <ShiftAnimation mode={props.shiftMode} />
+    <p className={styles.howToParagraph} style={{ marginTop: 24 }}>
+      On larger boards, Player X also gets the ability to shift the board in any
+      direction by 1.
+    </p>
+  </UIDialog>
+);
+
 const Lobby = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -345,51 +402,16 @@ const Lobby = () => {
         </div>
 
         {stats && stats.won + stats.lost + stats.drawn > 0 && (
-          <aside className={styles.statsPanel} aria-label="Your record">
-            <span className={styles.statsTitle}>Your record</span>
-            <dl className={styles.statsList}>
-              <div className={styles.statRow}>
-                <dt className={styles.statLabel}>Won</dt>
-                <dd className={`${styles.statValue} ${styles.statWon}`}>
-                  {stats.won}
-                </dd>
-              </div>
-              <div className={styles.statRow}>
-                <dt className={styles.statLabel}>Lost</dt>
-                <dd className={`${styles.statValue} ${styles.statLost}`}>
-                  {stats.lost}
-                </dd>
-              </div>
-              <div className={styles.statRow}>
-                <dt className={styles.statLabel}>Draw</dt>
-                <dd className={styles.statValue}>{stats.drawn}</dd>
-              </div>
-            </dl>
-          </aside>
+          <RecordPanel stats={stats} />
         )}
       </div>
 
-      <UIDialog
+      <HowToPlayDialog
         isOpen={howToOpen}
         close={() => setHowToOpen(false)}
-        title="How to play"
-        description="Tic tac toe - but with a twist!"
-      >
-        <p className={styles.howToParagraph}>
-          X moves first, O second - take turns
-          placing marks, and the first to line up {activeWinLength} in a row
-          (across, down, or diagonally) wins.
-        </p>
-        <p className={styles.howToParagraph}>
-          The twist: once per game, instead of placing a mark, O can reshape the
-          whole board with <strong>Grid Collapse</strong>:
-        </p>
-        <ShiftAnimation mode={activeShiftMode} />
-        <p className={styles.howToParagraph} style={{ marginTop: 24 }}>
-          On larger boards, Player X also gets the ability to shift the board in
-          any direction by 1.
-        </p>
-      </UIDialog>
+        winLength={activeWinLength}
+        shiftMode={activeShiftMode}
+      />
     </div>
   );
 };
