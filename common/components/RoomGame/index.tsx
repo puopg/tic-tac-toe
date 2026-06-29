@@ -100,8 +100,12 @@ const RoomGame = (props: Props) => {
       ? (room.board[room.winningLine[0]] as Player)
       : null;
   const bothSeated = room.seats.X !== null && room.seats.O !== null;
+  // Same-device play: the one seated player controls both sides, so both seats
+  // read "You" when seated; a spectator of a local room sees plain seat names.
+  const isLocal = room.mode === "local";
   const seatLabel = (seat: Player): string => {
     if (room.seats[seat] === AI_SEAT) return `AI (${seat})`;
+    if (isLocal) return mySeat ? `You (${seat})` : `Player ${seat}`;
     if (mySeat === seat) return `You (${seat})`;
     return `Player ${seat}`;
   };
@@ -113,8 +117,12 @@ const RoomGame = (props: Props) => {
   // "Your turn" is checked before the empty-seat case so a solo player who is on
   // turn (e.g. O after swapping seats) is prompted to act rather than told to
   // wait - mirroring canShiftNow, which also drops the bothSeated requirement.
+  // A local room has no "opponent" - one player moves for both sides - so it
+  // always reads the neutral, whose-turn-it-is status the spectator view uses.
   let status: StatusInfo;
-  if (!gameOver && mySeat && currentTurn === mySeat) {
+  if (isLocal) {
+    status = spectatorStatus(winner, currentTurn, gameOver);
+  } else if (!gameOver && mySeat && currentTurn === mySeat) {
     status = { message: "Your turn", tone: playerTone(currentTurn) };
   } else if (!gameOver && !bothSeated) {
     status = { message: "Waiting for opponent", tone: "neutral" };
@@ -216,6 +224,21 @@ const RoomGame = (props: Props) => {
           >
             Leave seat
           </button>
+        ) : isLocal ? (
+          // One player holds both seats, so a single "Play" claim (which takes
+          // both sides) replaces the per-side buttons; otherwise it's spectating.
+          room.seats.X === null && room.seats.O === null ? (
+            <button
+              type="button"
+              className={styles.seatButton}
+              onClick={() => handleClaim("X")}
+              disabled={paused}
+            >
+              Play
+            </button>
+          ) : (
+            <span className={styles.spectateBadge}>Spectating</span>
+          )
         ) : (
           <>
             {room.seats.X === null && (

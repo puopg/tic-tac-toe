@@ -304,11 +304,13 @@ function applyShift(room: Room, direction: Direction, mode: ShiftMode): void {
  * Swap the X and O seat holders (and their heartbeats) so the two players
  * alternate which mark they play - and therefore who moves first - on each new
  * round. The scores swap alongside them so each tally keeps following its player
- * across the seat change rather than the mark. A no-op in AI mode, where the
- * human keeps the side they chose and the AI keeps the opposite seat.
+ * across the seat change rather than the mark. Only two-player rooms alternate:
+ * AI mode keeps the human on the side they chose (and the AI opposite), and a
+ * local same-device room has one player holding both seats, so swapping them is
+ * meaningless and would only scramble the per-seat scores.
  */
 function swapSeats(room: Room): void {
-  if (room.mode === "ai") return;
+  if (room.mode !== "two-player") return;
   if (room.seats.X === null || room.seats.O === null) return; // nothing to alternate
   [room.seats.X, room.seats.O] = [room.seats.O, room.seats.X];
   [room.seatSeen.X, room.seatSeen.O] = [room.seatSeen.O, room.seatSeen.X];
@@ -598,6 +600,13 @@ export async function claimSeat(
         room.seatSeen[other] = null;
       }
       runAiTurn(room, archive, shiftMode);
+    } else if (room.mode === "local") {
+      // Same-device pass-and-play: one player controls both sides, so claiming
+      // either seat takes the other too. Both seats then heartbeat off the same
+      // player, and every move's turn check passes for whichever side is on turn.
+      const other = otherPlayer(seat);
+      room.seats[other] = playerId;
+      room.seatSeen[other] = now();
     }
     return touched(room);
   });
@@ -618,8 +627,11 @@ export async function leaveSeat(
     });
     // In an AI room the AI only occupies its seat to partner the human who chose
     // the other side, so when that human leaves, vacate the AI too and reset the
-    // round - the next player is then free to pick either side again.
-    if (left && room.mode === "ai") {
+    // round - the next player is then free to pick either side again. A local
+    // room is similar: its one player holds both seats (the forEach above frees
+    // both), so leaving abandons the whole game - clear the round and scores so
+    // the next player who claims it starts fresh.
+    if (left && room.mode !== "two-player") {
       SEATS.forEach((seat) => {
         if (room.seats[seat] === AI_SEAT) {
           room.seats[seat] = null;

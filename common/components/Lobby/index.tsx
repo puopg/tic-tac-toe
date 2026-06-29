@@ -208,6 +208,14 @@ const Lobby = () => {
           >
             vs AI
           </button>
+          <button
+            type="button"
+            className={mode === "local" ? styles.modeActive : styles.mode}
+            onClick={() => setMode("local")}
+            aria-pressed={mode === "local"}
+          >
+            Local
+          </button>
         </div>
         <button
           type="submit"

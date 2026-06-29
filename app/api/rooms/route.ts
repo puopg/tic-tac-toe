@@ -14,7 +14,8 @@ export async function POST(request: Request) {
   if (!body) return badRequest();
 
   const name = typeof body.name === "string" ? body.name : "";
-  const mode: RoomMode = body.mode === "ai" ? "ai" : "two-player";
+  const mode: RoomMode =
+    body.mode === "ai" || body.mode === "local" ? body.mode : "two-player";
 
   return storeResponse(await createRoom(name, mode), 201);
 }
