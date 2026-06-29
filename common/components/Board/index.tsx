@@ -92,6 +92,31 @@ export const DEFAULT_BOARD_ANIMATION: BoardAnimationConfig = {
   leanSquash: 0.17,
 };
 
+/**
+ * Live cell size in px for a `size`×`size` board, measured from the marks
+ * overlay (which is inset to the cells) and kept current on resize. The marks
+ * layer positions by pixel offset, which is what react-spring animates, so it
+ * needs the measured cell rather than the CSS grid's implicit sizing. Returns
+ * the ref to attach to the overlay and the current cell size (0 until measured).
+ */
+function useCellSize(size: number): {
+  layerRef: React.RefObject<HTMLDivElement | null>;
+  cell: number;
+} {
+  const layerRef = useRef<HTMLDivElement>(null);
+  const [cell, setCell] = useState(0);
+  useEffect(() => {
+    const el = layerRef.current;
+    if (!el) return;
+    const measure = () => setCell((el.clientWidth - (size - 1) * GAP) / size);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [size]);
+  return { layerRef, cell };
+}
+
 /** Whether a sweep is vertical (up/down) - those lean by squashing; horizontal
  *  (left/right) sweeps lean by tilting. */
 function isVertical(direction: Direction): boolean {
@@ -260,19 +285,8 @@ const Board = (props: Props) => {
   const size = boardSize(board);
 
   // Live cell size in px so the marks layer can position by pixel offset, which
-  // is what react-spring animates. Measured from the overlay, which is inset to
-  // the cells, and kept current on resize.
-  const layerRef = useRef<HTMLDivElement>(null);
-  const [cell, setCell] = useState(0);
-  useEffect(() => {
-    const el = layerRef.current;
-    if (!el) return;
-    const measure = () => setCell((el.clientWidth - (size - 1) * GAP) / size);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [size]);
+  // is what react-spring animates; layerRef attaches to that overlay.
+  const { layerRef, cell } = useCellSize(size);
 
   const reducedMotion = useReducedMotion();
 
