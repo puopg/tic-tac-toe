@@ -5,6 +5,7 @@ import classNames from "classnames";
 import { IoArrowForward } from "react-icons/io5";
 import { INITIAL_SIZE } from "@/constants/game";
 import { DEFAULT_SHIFT_MODE, type ShiftMode } from "@/utils/gameLogic";
+import { useReducedMotion } from "@/lib/useReducedMotion";
 import styles from "./styles.module.scss";
 
 type SceneMark = {
@@ -67,6 +68,36 @@ const SHIFT_MS = 750;
 const HOLD_MS = 1100;
 
 /**
+ * One mark in the scene, placed by its starting cell and animated to its
+ * destination when `shifted` flips: a numbered `to` slides that many cells, a
+ * "fall" target drops off the edge. Owns the grid-placement and shift-distance
+ * styling so the scene's map body stays a single element.
+ */
+const SceneMarkView = (props: { mark: SceneMark; shifted: boolean }) => {
+  const { mark, shifted } = props;
+  const cells = typeof mark.to === "number" ? mark.to - mark.col : 0;
+  return (
+    <div
+      className={classNames(styles.mark, {
+        [styles.x]: mark.player === "X",
+        [styles.o]: mark.player === "O",
+        [styles.shifted]: shifted && typeof mark.to === "number",
+        [styles.fallOff]: shifted && mark.to === "fall",
+      })}
+      style={
+        {
+          gridColumn: mark.col + 1,
+          gridRow: mark.row + 1,
+          "--shift-cells": cells,
+        } as React.CSSProperties
+      }
+    >
+      {mark.player}
+    </div>
+  );
+};
+
+/**
  * Looping, decorative illustration of player O's grid shift, shown at the bottom
  * of the "How to play" dialog. A directional arrow fades in and drifts, then the
  * marks resolve the shift for the active {@link ShiftMode}: in "classic" each
@@ -76,21 +107,13 @@ const HOLD_MS = 1100;
  * Honours `prefers-reduced-motion` by holding the starting board still.
  */
 const ShiftAnimation = ({ mode = DEFAULT_SHIFT_MODE }: { mode?: ShiftMode }) => {
-  const [reducedMotion, setReducedMotion] = useState(false);
+  const reducedMotion = useReducedMotion();
   const [shifted, setShifted] = useState(false);
   // Bumped each loop and used as a remount key so the scene resets to its start
   // state without playing every transition in reverse.
   const [cycle, setCycle] = useState(0);
 
   const scene = SCENES[mode] ?? SCENES[DEFAULT_SHIFT_MODE];
-
-  useEffect(() => {
-    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReducedMotion(mql.matches);
-    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, []);
 
   useEffect(() => {
     if (reducedMotion) return;
@@ -115,29 +138,9 @@ const ShiftAnimation = ({ mode = DEFAULT_SHIFT_MODE }: { mode?: ShiftMode }) => 
         </div>
 
         <div key={`marks-${cycle}`} className={styles.marks}>
-          {scene.marks.map((mark) => {
-            const cells = typeof mark.to === "number" ? mark.to - mark.col : 0;
-            return (
-              <div
-                key={mark.id}
-                className={classNames(styles.mark, {
-                  [styles.x]: mark.player === "X",
-                  [styles.o]: mark.player === "O",
-                  [styles.shifted]: shifted && typeof mark.to === "number",
-                  [styles.fallOff]: shifted && mark.to === "fall",
-                })}
-                style={
-                  {
-                    gridColumn: mark.col + 1,
-                    gridRow: mark.row + 1,
-                    "--shift-cells": cells,
-                  } as React.CSSProperties
-                }
-              >
-                {mark.player}
-              </div>
-            );
-          })}
+          {scene.marks.map((mark) => (
+            <SceneMarkView key={mark.id} mark={mark} shifted={shifted} />
+          ))}
         </div>
 
         {!reducedMotion && (

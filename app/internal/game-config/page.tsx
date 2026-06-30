@@ -45,6 +45,134 @@ const MODE_COPY: Record<ShiftMode, { title: string; blurb: string }> = {
 const range = (min: number, max: number): number[] =>
   Array.from({ length: max - min + 1 }, (_, i) => min + i);
 
+/** A labelled row of single-select segment buttons over a list of numbers. */
+const Segmented = (props: {
+  label: string;
+  values: number[];
+  selected: number;
+  busy: boolean;
+  onSelect: (value: number) => void;
+}) => (
+  <div className={styles.segmented} role="group" aria-label={props.label}>
+    {props.values.map((n) => (
+      <button
+        key={n}
+        type="button"
+        className={styles.segment}
+        aria-pressed={props.selected === n}
+        disabled={props.busy}
+        onClick={() => props.onSelect(n)}
+      >
+        {n}
+      </button>
+    ))}
+  </div>
+);
+
+/** The "O's shift behaviour" section: mode toggle plus before/after examples. */
+const ShiftModeSection = (props: {
+  shiftMode: ShiftMode;
+  busy: boolean;
+  onSelect: (mode: ShiftMode) => void;
+}) => (
+  <section className={styles.section}>
+    <h2 className={styles.sectionTitle}>O&rsquo;s shift behaviour</h2>
+    <div className={styles.toggle} role="group" aria-label="Shift mode">
+      {(Object.keys(MODE_COPY) as ShiftMode[]).map((mode) => (
+        <button
+          key={mode}
+          type="button"
+          className={styles.option}
+          aria-pressed={props.shiftMode === mode}
+          disabled={props.busy}
+          onClick={() => props.onSelect(mode)}
+        >
+          <span className={styles.optionTitle}>{MODE_COPY[mode].title}</span>
+          <span className={styles.optionBlurb}>{MODE_COPY[mode].blurb}</span>
+        </button>
+      ))}
+    </div>
+    <p className={styles.active}>
+      Active mode: <strong>{MODE_COPY[props.shiftMode].title}</strong>
+    </p>
+
+    <div className={styles.examples}>
+      <figure className={styles.example}>
+        <MiniBoard board={EXAMPLE_BOARD} />
+        <figcaption>Before</figcaption>
+      </figure>
+      <figure className={styles.example}>
+        <MiniBoard board={shiftBoard(EXAMPLE_BOARD, "right", "classic")} />
+        <figcaption>Classic →</figcaption>
+      </figure>
+      <figure className={styles.example}>
+        <MiniBoard board={shiftBoard(EXAMPLE_BOARD, "right", "collapse")} />
+        <figcaption>Collapse →</figcaption>
+      </figure>
+    </div>
+  </section>
+);
+
+/** The "Board size & win length" section: two segmented controls plus a preview. */
+const BoardSizeSection = (props: {
+  boardSize: number;
+  winLength: number;
+  busy: boolean;
+  onChange: (patch: Partial<GameConfig>) => void;
+}) => {
+  // A sample board showing a winning run: the first `winLength` cells of the top
+  // row are filled so MiniBoard highlights them, making the run length visible
+  // against the board size.
+  const previewBoard: Board = Array(
+    props.boardSize * props.boardSize,
+  ).fill(null);
+  for (let i = 0; i < props.winLength; i++) previewBoard[i] = "X";
+
+  return (
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>Board size &amp; win length</h2>
+
+      <h3 className={styles.subheading}>Board size</h3>
+      <p className={styles.subtitle}>
+        New games are played on an N×N board, from {MIN_BOARD_SIZE} up to{" "}
+        {MAX_BOARD_SIZE} cells per side.
+      </p>
+      <Segmented
+        label="Board size"
+        values={range(MIN_BOARD_SIZE, MAX_BOARD_SIZE)}
+        selected={props.boardSize}
+        busy={props.busy}
+        onSelect={(n) => props.onChange({ boardSize: n })}
+      />
+
+      <h3 className={styles.subheading}>Win length</h3>
+      <p className={styles.subtitle}>
+        How many of your marks in a row - across, down, or diagonally - wins.
+        Capped at the board size.
+      </p>
+      <Segmented
+        label="Win length"
+        values={range(MIN_WIN_LENGTH, props.boardSize)}
+        selected={props.winLength}
+        busy={props.busy}
+        onSelect={(n) => props.onChange({ winLength: n })}
+      />
+
+      <figure className={styles.preview}>
+        <MiniBoard
+          board={previewBoard}
+          winLength={props.winLength}
+          cellSize={28}
+        />
+        <figcaption>
+          {props.boardSize}×{props.boardSize} board, {props.winLength} in a row
+          to win
+        </figcaption>
+      </figure>
+    </section>
+  );
+};
+
 /**
  * Internal POC tool at /internal/game-config for trying out rule variants: the
  * experimental shift behaviour, the board size, and the run length needed to
@@ -72,13 +200,6 @@ const GameConfigPage = () => {
   }
 
   const update = (patch: Partial<GameConfig>) => mutation.mutate(patch);
-  // A sample board showing a winning run: the first `winLength` cells of the top
-  // row are filled so MiniBoard highlights them, making the run length visible
-  // against the board size.
-  const previewBoard: Board = Array(
-    config.boardSize * config.boardSize,
-  ).fill(null);
-  for (let i = 0; i < config.winLength; i++) previewBoard[i] = "X";
 
   return (
     <main className={styles.main}>
@@ -90,98 +211,18 @@ const GameConfigPage = () => {
         </p>
       </header>
 
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>O&rsquo;s shift behaviour</h2>
-        <div className={styles.toggle} role="group" aria-label="Shift mode">
-          {(Object.keys(MODE_COPY) as ShiftMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              className={styles.option}
-              aria-pressed={config.shiftMode === mode}
-              disabled={mutation.isPending}
-              onClick={() => update({ shiftMode: mode })}
-            >
-              <span className={styles.optionTitle}>{MODE_COPY[mode].title}</span>
-              <span className={styles.optionBlurb}>{MODE_COPY[mode].blurb}</span>
-            </button>
-          ))}
-        </div>
-        <p className={styles.active}>
-          Active mode: <strong>{MODE_COPY[config.shiftMode].title}</strong>
-        </p>
+      <ShiftModeSection
+        shiftMode={config.shiftMode}
+        busy={mutation.isPending}
+        onSelect={(shiftMode) => update({ shiftMode })}
+      />
 
-        <div className={styles.examples}>
-          <figure className={styles.example}>
-            <MiniBoard board={EXAMPLE_BOARD} />
-            <figcaption>Before</figcaption>
-          </figure>
-          <figure className={styles.example}>
-            <MiniBoard board={shiftBoard(EXAMPLE_BOARD, "right", "classic")} />
-            <figcaption>Classic →</figcaption>
-          </figure>
-          <figure className={styles.example}>
-            <MiniBoard board={shiftBoard(EXAMPLE_BOARD, "right", "collapse")} />
-            <figcaption>Collapse →</figcaption>
-          </figure>
-        </div>
-      </section>
-
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Board size &amp; win length</h2>
-
-        <h3 className={styles.subheading}>Board size</h3>
-        <p className={styles.subtitle}>
-          New games are played on an N×N board, from {MIN_BOARD_SIZE} up to{" "}
-          {MAX_BOARD_SIZE} cells per side.
-        </p>
-        <div className={styles.segmented} role="group" aria-label="Board size">
-          {range(MIN_BOARD_SIZE, MAX_BOARD_SIZE).map((n) => (
-            <button
-              key={n}
-              type="button"
-              className={styles.segment}
-              aria-pressed={config.boardSize === n}
-              disabled={mutation.isPending}
-              onClick={() => update({ boardSize: n })}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-
-        <h3 className={styles.subheading}>Win length</h3>
-        <p className={styles.subtitle}>
-          How many of your marks in a row - across, down, or diagonally - wins.
-          Capped at the board size.
-        </p>
-        <div className={styles.segmented} role="group" aria-label="Win length">
-          {range(MIN_WIN_LENGTH, config.boardSize).map((n) => (
-            <button
-              key={n}
-              type="button"
-              className={styles.segment}
-              aria-pressed={config.winLength === n}
-              disabled={mutation.isPending}
-              onClick={() => update({ winLength: n })}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-
-        <figure className={styles.preview}>
-          <MiniBoard
-            board={previewBoard}
-            winLength={config.winLength}
-            cellSize={28}
-          />
-          <figcaption>
-            {config.boardSize}×{config.boardSize} board, {config.winLength} in a
-            row to win
-          </figcaption>
-        </figure>
-      </section>
+      <BoardSizeSection
+        boardSize={config.boardSize}
+        winLength={config.winLength}
+        busy={mutation.isPending}
+        onChange={update}
+      />
     </main>
   );
 };

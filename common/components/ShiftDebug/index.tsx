@@ -81,14 +81,108 @@ const Slider = (props: {
   </label>
 );
 
+/** A tension/friction spring pair under a legend - the three springs share this
+ *  shape and differ only by legend and tension range. */
+const SpringGroup = (props: {
+  legend: string;
+  spring: { tension: number; friction: number };
+  tensionMax: number;
+  setField: (field: "tension" | "friction") => (value: number) => void;
+}) => (
+  <fieldset className={styles.group}>
+    <legend>{props.legend}</legend>
+    <Slider
+      label="tension"
+      value={props.spring.tension}
+      min={50}
+      max={props.tensionMax}
+      step={10}
+      onChange={props.setField("tension")}
+    />
+    <Slider
+      label="friction"
+      value={props.spring.friction}
+      min={2}
+      max={60}
+      step={1}
+      onChange={props.setField("friction")}
+    />
+  </fieldset>
+);
+
+/** The directional d-pad that picks the shift direction. */
+const DPad = (props: {
+  direction: Direction;
+  onSelect: (dir: Direction) => void;
+}) => (
+  <div className={styles.dpad}>
+    {DIRECTIONS.map(({ dir, glyph }) => (
+      <button
+        key={dir}
+        type="button"
+        className={classNames(styles.dirButton, styles[dir], {
+          [styles.dirActive]: dir === props.direction,
+        })}
+        onClick={() => props.onSelect(dir)}
+      >
+        {glyph}
+      </button>
+    ))}
+  </div>
+);
+
+/** The classic/collapse shift-mode toggle. */
+const ModeToggle = (props: {
+  mode: ShiftMode;
+  onSelect: (mode: ShiftMode) => void;
+}) => (
+  <div className={styles.modes}>
+    {MODES.map((m) => (
+      <button
+        key={m}
+        type="button"
+        className={classNames(styles.modeButton, {
+          [styles.modeActive]: m === props.mode,
+        })}
+        onClick={() => props.onSelect(m)}
+      >
+        {m}
+      </button>
+    ))}
+  </div>
+);
+
+/** The serialized-config readout with reset/copy actions and paste hint. */
+const Readout = (props: {
+  source: string;
+  copied: boolean;
+  onReset: () => void;
+  onCopy: () => void;
+}) => (
+  <div className={styles.readout}>
+    <div className={styles.readoutActions}>
+      <button type="button" className={styles.resetButton} onClick={props.onReset}>
+        Reset to defaults
+      </button>
+      <button type="button" className={styles.copyButton} onClick={props.onCopy}>
+        {props.copied ? "Copied!" : "Copy config"}
+      </button>
+    </div>
+    <p className={styles.hint}>
+      Paste over <code>DEFAULT_BOARD_ANIMATION</code> in Board/index.tsx
+    </p>
+    <pre className={styles.json}>{props.source}</pre>
+  </div>
+);
+
 /**
- * Dev-only harness for tuning the grid-shift animation. Renders the real
- * <Board> on a fixed scene, loops the shift in a chosen direction, and exposes
- * the {@link BoardAnimationConfig} springs/timings as live sliders so the motion
- * can be dialled in without editing code. The JSON readout can be pasted back
- * into DEFAULT_BOARD_ANIMATION once a feel is settled.
+ * The harness's animation-loop and config-tuning engine: the chosen
+ * direction/mode, the live {@link BoardAnimationConfig}, the self-flipping
+ * play/rest loop that drives the board, and the serialized-config + copy state.
+ * Returns render-ready board state, selectors that restart the loop on a
+ * direction/mode switch, the spring/number field setters, and the readout.
  */
-const ShiftDebug = ({ onClose }: { onClose: () => void }) => {
+const useShiftDebug = () => {
   const [direction, setDirection] = useState<Direction>("right");
   const [mode, setMode] = useState<ShiftMode>("collapse");
   const [anim, setAnim] = useState<BoardAnimationConfig>(DEFAULT_BOARD_ANIMATION);
@@ -137,6 +231,54 @@ const ShiftDebug = ({ onClose }: { onClose: () => void }) => {
     );
   };
 
+  return {
+    board: playing ? shifted : INITIAL,
+    transition,
+    anim,
+    direction,
+    mode,
+    // Switching direction/mode drops back to rest for a clean restart.
+    selectDirection: (dir: Direction) => {
+      setDirection(dir);
+      setPlaying(false);
+    },
+    selectMode: (m: ShiftMode) => {
+      setMode(m);
+      setPlaying(false);
+    },
+    setSpring,
+    setNum,
+    source,
+    copied,
+    reset: () => setAnim(DEFAULT_BOARD_ANIMATION),
+    copy,
+  };
+};
+
+/**
+ * Dev-only harness for tuning the grid-shift animation. Renders the real
+ * <Board> on a fixed scene, loops the shift in a chosen direction, and exposes
+ * the {@link BoardAnimationConfig} springs/timings as live sliders so the motion
+ * can be dialled in without editing code. The JSON readout can be pasted back
+ * into DEFAULT_BOARD_ANIMATION once a feel is settled.
+ */
+const ShiftDebug = ({ onClose }: { onClose: () => void }) => {
+  const {
+    board,
+    transition,
+    anim,
+    direction,
+    mode,
+    selectDirection,
+    selectMode,
+    setSpring,
+    setNum,
+    source,
+    copied,
+    reset,
+    copy,
+  } = useShiftDebug();
+
   return (
     <div className={styles.backdrop} role="dialog" aria-label="Shift animation debug">
       <div className={styles.panel}>
@@ -151,7 +293,7 @@ const ShiftDebug = ({ onClose }: { onClose: () => void }) => {
           <div className={styles.stage}>
             <div className={styles.boardWrap}>
               <Board
-                board={playing ? shifted : INITIAL}
+                board={board}
                 winningLine={null}
                 onSquareClick={() => {}}
                 disabled
@@ -160,61 +302,32 @@ const ShiftDebug = ({ onClose }: { onClose: () => void }) => {
               />
             </div>
 
-            <div className={styles.dpad}>
-              {DIRECTIONS.map(({ dir, glyph }) => (
-                <button
-                  key={dir}
-                  type="button"
-                  className={classNames(styles.dirButton, styles[dir], {
-                    [styles.dirActive]: dir === direction,
-                  })}
-                  onClick={() => {
-                    setDirection(dir);
-                    setPlaying(false);
-                  }}
-                >
-                  {glyph}
-                </button>
-              ))}
-            </div>
+            <DPad direction={direction} onSelect={selectDirection} />
 
-            <div className={styles.modes}>
-              {MODES.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={classNames(styles.modeButton, {
-                    [styles.modeActive]: m === mode,
-                  })}
-                  onClick={() => {
-                    setMode(m);
-                    setPlaying(false);
-                  }}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
+            <ModeToggle mode={mode} onSelect={selectMode} />
           </div>
 
           <div className={styles.controls}>
-            <fieldset className={styles.group}>
-              <legend>Lean spring</legend>
-              <Slider label="tension" value={anim.leanSpring.tension} min={50} max={1500} step={10} onChange={setSpring("leanSpring", "tension")} />
-              <Slider label="friction" value={anim.leanSpring.friction} min={2} max={60} step={1} onChange={setSpring("leanSpring", "friction")} />
-            </fieldset>
+            <SpringGroup
+              legend="Lean spring"
+              spring={anim.leanSpring}
+              tensionMax={1500}
+              setField={(field) => setSpring("leanSpring", field)}
+            />
 
-            <fieldset className={styles.group}>
-              <legend>Slide spring (speed)</legend>
-              <Slider label="tension" value={anim.slideSpring.tension} min={50} max={1000} step={10} onChange={setSpring("slideSpring", "tension")} />
-              <Slider label="friction" value={anim.slideSpring.friction} min={2} max={60} step={1} onChange={setSpring("slideSpring", "friction")} />
-            </fieldset>
+            <SpringGroup
+              legend="Slide spring (speed)"
+              spring={anim.slideSpring}
+              tensionMax={1000}
+              setField={(field) => setSpring("slideSpring", field)}
+            />
 
-            <fieldset className={styles.group}>
-              <legend>Release spring (back + fade)</legend>
-              <Slider label="tension" value={anim.departSpring.tension} min={50} max={1000} step={10} onChange={setSpring("departSpring", "tension")} />
-              <Slider label="friction" value={anim.departSpring.friction} min={2} max={60} step={1} onChange={setSpring("departSpring", "friction")} />
-            </fieldset>
+            <SpringGroup
+              legend="Release spring (back + fade)"
+              spring={anim.departSpring}
+              tensionMax={1000}
+              setField={(field) => setSpring("departSpring", field)}
+            />
 
             <fieldset className={styles.group}>
               <legend>Lean shape & timing</legend>
@@ -224,29 +337,12 @@ const ShiftDebug = ({ onClose }: { onClose: () => void }) => {
               <Slider label="squash" value={anim.leanSquash} min={0} max={0.5} step={0.01} onChange={setNum("leanSquash")} />
             </fieldset>
 
-            <div className={styles.readout}>
-              <div className={styles.readoutActions}>
-                <button
-                  type="button"
-                  className={styles.resetButton}
-                  onClick={() => setAnim(DEFAULT_BOARD_ANIMATION)}
-                >
-                  Reset to defaults
-                </button>
-                <button
-                  type="button"
-                  className={styles.copyButton}
-                  onClick={copy}
-                >
-                  {copied ? "Copied!" : "Copy config"}
-                </button>
-              </div>
-              <p className={styles.hint}>
-                Paste over <code>DEFAULT_BOARD_ANIMATION</code> in
-                Board/index.tsx
-              </p>
-              <pre className={styles.json}>{source}</pre>
-            </div>
+            <Readout
+              source={source}
+              copied={copied}
+              onReset={reset}
+              onCopy={copy}
+            />
           </div>
         </div>
       </div>

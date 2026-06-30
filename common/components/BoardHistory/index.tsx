@@ -19,6 +19,45 @@ type Props = {
 const SCROLL_STEP = 140;
 
 /**
+ * One row of the history list: the move number, a `MiniBoard` snapshot of the
+ * position after this move, and a label of who moved and what they did. Owns the
+ * per-entry derivation (the snapshot rebuild and the move description) so the
+ * list's map body stays a single element.
+ */
+const HistoryEntry = (props: {
+  actions: GameAction[];
+  index: number;
+  size: number;
+  winLength: number;
+}) => {
+  const { player, move } = describeAction(
+    props.actions[props.index],
+    props.index,
+    props.size,
+  );
+  return (
+    <div className={styles.entry}>
+      <span className={styles.moveNo}>{props.index + 1}</span>
+      <MiniBoard
+        board={boardAfterActions(props.actions, props.index + 1, props.size)}
+        winLength={props.winLength}
+      />
+      <span className={styles.label}>
+        <span
+          className={classNames(styles.mark, {
+            [styles.markX]: player === "X",
+            [styles.markO]: player === "O",
+          })}
+        >
+          {player}
+        </span>
+        <span className={styles.move}>{move}</span>
+      </span>
+    </div>
+  );
+};
+
+/**
  * A faded, hover-revealed column of every prior board state in move order
  * (oldest at top, newest at bottom). Each entry pairs a `MiniBoard` snapshot of
  * the position after that move with a compact label of who moved and what they
@@ -82,29 +121,15 @@ const BoardHistory = (props: Props) => {
       </button>
 
       <div className={styles.list} ref={listRef} onScroll={updateArrows}>
-        {props.actions.map((action, i) => {
-          const { player, move } = describeAction(action, i, props.size);
-          return (
-            <div className={styles.entry} key={i}>
-              <span className={styles.moveNo}>{i + 1}</span>
-              <MiniBoard
-                board={boardAfterActions(props.actions, i + 1, props.size)}
-                winLength={props.winLength}
-              />
-              <span className={styles.label}>
-                <span
-                  className={classNames(styles.mark, {
-                    [styles.markX]: player === "X",
-                    [styles.markO]: player === "O",
-                  })}
-                >
-                  {player}
-                </span>
-                <span className={styles.move}>{move}</span>
-              </span>
-            </div>
-          );
-        })}
+        {props.actions.map((_, i) => (
+          <HistoryEntry
+            key={i}
+            actions={props.actions}
+            index={i}
+            size={props.size}
+            winLength={props.winLength}
+          />
+        ))}
       </div>
 
       <button

@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import classNames from "classnames";
-import { animated, to, useSpring, useTransition } from "@react-spring/web";
+import {
+  animated,
+  to,
+  useSpring,
+  useTransition,
+  type SpringValue,
+} from "@react-spring/web";
 import {
   boardSize,
   DIRECTION_STEPS,
@@ -14,6 +20,7 @@ import {
 } from "@/utils/gameLogic";
 import Square from "@/common/components/Square";
 import WinningLine from "@/common/components/WinningLine";
+import { useReducedMotion } from "@/lib/useReducedMotion";
 import styles from "./styles.module.scss";
 
 /** Board grid gap in px; keep in sync with `gap` in styles.module.scss. */
@@ -84,6 +91,31 @@ export const DEFAULT_BOARD_ANIMATION: BoardAnimationConfig = {
   leanTiltDeg: 12,
   leanSquash: 0.17,
 };
+
+/**
+ * Live cell size in px for a `size`×`size` board, measured from the marks
+ * overlay (which is inset to the cells) and kept current on resize. The marks
+ * layer positions by pixel offset, which is what react-spring animates, so it
+ * needs the measured cell rather than the CSS grid's implicit sizing. Returns
+ * the ref to attach to the overlay and the current cell size (0 until measured).
+ */
+function useCellSize(size: number): {
+  layerRef: React.RefObject<HTMLDivElement | null>;
+  cell: number;
+} {
+  const layerRef = useRef<HTMLDivElement>(null);
+  const [cell, setCell] = useState(0);
+  useEffect(() => {
+    const el = layerRef.current;
+    if (!el) return;
+    const measure = () => setCell((el.clientWidth - (size - 1) * GAP) / size);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [size]);
+  return { layerRef, cell };
+}
 
 /** Whether a sweep is vertical (up/down) - those lean by squashing; horizontal
  *  (left/right) sweeps lean by tilting. */
@@ -189,6 +221,62 @@ type Props = {
   animation?: BoardAnimationConfig;
 };
 
+/** The animated x/y/scale/opacity springs `useTransition` drives for one mark. */
+type SpriteStyle = {
+  x: SpringValue<number>;
+  y: SpringValue<number>;
+  scale: SpringValue<number>;
+  opacity: SpringValue<number>;
+};
+
+/**
+ * One animated mark in the overlay: it positions/fades/scales off its own
+ * transition springs (`style`) and composes in the shared shift lean - the
+ * board-level `lean` spring (0..1) scaling `leanPeak`'s tilt/squash, but only
+ * for marks that move this shift (`sprite.leans`), so the rest stay still.
+ */
+const MarkSprite = (props: {
+  style: SpriteStyle;
+  sprite: Sprite;
+  cell: number;
+  lean: SpringValue<number>;
+  leanPeak: { rotate: number; squash: number };
+  squashOrigin: string;
+}) => {
+  const { style, sprite, cell, lean, leanPeak, squashOrigin } = props;
+  return (
+    <animated.div
+      className={classNames(
+        styles.mark,
+        sprite.player === "X" ? styles.x : styles.o,
+      )}
+      style={{
+        width: cell,
+        height: cell,
+        fontSize: cell * 0.56,
+        opacity: style.opacity,
+        transformOrigin: squashOrigin,
+        transform: to(
+          [style.x, style.y, style.scale, lean],
+          (x, y, s, l) => {
+            // The shared lean spring (l: 0..1) scales the direction's peak
+            // sway - but only for marks that actually move this shift, so a
+            // stationary mark stays perfectly still. scaleY alone carries the
+            // squash, so a vertical sweep just squishes the mark; scaleX stays
+            // at the scale.
+            const m = sprite.leans ? l : 0;
+            const r = leanPeak.rotate * m;
+            const sy = s * (1 - leanPeak.squash * m);
+            return `translate(${x}px, ${y}px) rotate(${r}deg) scale(${s}, ${sy})`;
+          },
+        ),
+      }}
+    >
+      {sprite.player}
+    </animated.div>
+  );
+};
+
 const Board = (props: Props) => {
   const { board, transition } = props;
   const anim = props.animation ?? DEFAULT_BOARD_ANIMATION;
@@ -197,28 +285,10 @@ const Board = (props: Props) => {
   const size = boardSize(board);
 
   // Live cell size in px so the marks layer can position by pixel offset, which
-  // is what react-spring animates. Measured from the overlay, which is inset to
-  // the cells, and kept current on resize.
-  const layerRef = useRef<HTMLDivElement>(null);
-  const [cell, setCell] = useState(0);
-  useEffect(() => {
-    const el = layerRef.current;
-    if (!el) return;
-    const measure = () => setCell((el.clientWidth - (size - 1) * GAP) / size);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [size]);
+  // is what react-spring animates; layerRef attaches to that overlay.
+  const { layerRef, cell } = useCellSize(size);
 
-  const [reducedMotion, setReducedMotion] = useState(false);
-  useEffect(() => {
-    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReducedMotion(mql.matches);
-    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
-  }, []);
+  const reducedMotion = useReducedMotion();
 
   // Reconcile the sprite list during render (a derived-state pattern): a fresh
   // transition animates the change, any other board change snaps. Guarded by the
@@ -372,35 +442,14 @@ const Board = (props: Props) => {
       <div ref={layerRef} className={styles.marks} aria-hidden="true">
         {cell > 0 &&
           transitions((style, sprite) => (
-            <animated.div
-              className={classNames(
-                styles.mark,
-                sprite.player === "X" ? styles.x : styles.o,
-              )}
-              style={{
-                width: cell,
-                height: cell,
-                fontSize: cell * 0.56,
-                opacity: style.opacity,
-                transformOrigin: squashOrigin,
-                transform: to(
-                  [style.x, style.y, style.scale, leanStyle.lean],
-                  (x, y, s, l) => {
-                    // The shared lean spring (l: 0..1) scales the direction's
-                    // peak sway - but only for marks that actually move this
-                    // shift, so a stationary mark stays perfectly still. scaleY
-                    // alone carries the squash, so a vertical sweep just squishes
-                    // the mark; scaleX stays at the scale.
-                    const lean = sprite.leans ? l : 0;
-                    const r = leanPeak.rotate * lean;
-                    const sy = s * (1 - leanPeak.squash * lean);
-                    return `translate(${x}px, ${y}px) rotate(${r}deg) scale(${s}, ${sy})`;
-                  },
-                ),
-              }}
-            >
-              {sprite.player}
-            </animated.div>
+            <MarkSprite
+              style={style}
+              sprite={sprite}
+              cell={cell}
+              lean={leanStyle.lean}
+              leanPeak={leanPeak}
+              squashOrigin={squashOrigin}
+            />
           ))}
       </div>
 

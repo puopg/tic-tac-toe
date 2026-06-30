@@ -44,7 +44,138 @@ const ARROW_DIR_CLASS: Record<Direction, string> = {
   right: styles.arrowRight,
 };
 
-const Replay = (props: Props) => {
+/**
+ * The transport bar under the board: jump-to-start, previous, play/pause,
+ * next, jump-to-end. Pure presentation - it owns no state, just reflects the
+ * current step and fires the parent's `goTo`/`togglePlay` handlers, so the main
+ * render stays focused on deriving the board position.
+ */
+const ReplayControls = (props: {
+  step: number;
+  total: number;
+  playing: boolean;
+  atStart: boolean;
+  atEnd: boolean;
+  goTo: (next: number) => void;
+  togglePlay: () => void;
+}) => (
+  <div className={styles.controls} role="group" aria-label="Replay controls">
+    <button
+      type="button"
+      className={styles.controlButton}
+      onClick={() => props.goTo(0)}
+      disabled={props.atStart}
+      aria-label="Jump to start"
+    >
+      ⏮
+    </button>
+    <button
+      type="button"
+      className={styles.controlButton}
+      onClick={() => props.goTo(props.step - 1)}
+      disabled={props.atStart}
+      aria-label="Previous move"
+    >
+      ◀
+    </button>
+    <button
+      type="button"
+      className={styles.playButton}
+      onClick={props.togglePlay}
+      disabled={props.total === 0}
+      aria-label={props.playing ? "Pause" : "Play"}
+    >
+      {props.playing ? "Pause" : props.atEnd ? "Replay" : "Play"}
+    </button>
+    <button
+      type="button"
+      className={styles.controlButton}
+      onClick={() => props.goTo(props.step + 1)}
+      disabled={props.atEnd}
+      aria-label="Next move"
+    >
+      ▶
+    </button>
+    <button
+      type="button"
+      className={styles.controlButton}
+      onClick={() => props.goTo(props.total)}
+      disabled={props.atEnd}
+      aria-label="Jump to end"
+    >
+      ⏭
+    </button>
+  </div>
+);
+
+/**
+ * The replay board plus its shift-cue overlay. The board itself plays the move
+ * motion via `transition`; this adds the directional arrow that flashes over the
+ * grid during a shift cue (`arrowDir`, faded out on a timer by the parent). Pure
+ * presentation - read-only, so square clicks are inert.
+ */
+const ReplayBoard = (props: {
+  board: ReturnType<typeof boardAfterActions>;
+  winningLine: readonly number[] | null;
+  transition: BoardTransition | null;
+  arrowDir: Direction | null;
+}) => (
+  <div className={styles.boardWrap}>
+    <Board
+      board={props.board}
+      winningLine={props.winningLine}
+      onSquareClick={() => {}}
+      disabled
+      transition={props.transition}
+    />
+
+    {props.arrowDir && (
+      <div
+        className={classNames(styles.shiftArrow, ARROW_DIR_CLASS[props.arrowDir])}
+        aria-hidden="true"
+      >
+        <IoArrowForward className={styles.shiftArrowIcon} />
+      </div>
+    )}
+  </div>
+);
+
+/**
+ * The narration shown below the board: the "Turn N / total" progress counter and
+ * the sentence describing the move just shown (or "Start of game" at step 0). A
+ * shift move gets a distinct caption style; `aria-live` announces each change.
+ */
+const MoveNarration = (props: {
+  step: number;
+  total: number;
+  lastAction: CompletedGameView["actions"][number] | null;
+  size: number;
+}) => (
+  <>
+    <div className={styles.progress}>
+      Turn {props.step} / {props.total}
+    </div>
+
+    <p
+      className={classNames(styles.moveCaption, {
+        [styles.moveCaptionShift]: props.lastAction?.kind === "shift",
+      })}
+      aria-live="polite"
+    >
+      {props.lastAction
+        ? actionSentence(props.lastAction, props.step - 1, props.size)
+        : "Start of game"}
+    </p>
+  </>
+);
+
+/**
+ * The replay playback engine: fetches the immutable completed game once, owns
+ * all transport state (step/playing) plus the per-step animation cues, and
+ * exposes the goTo/togglePlay handlers. Pulling this out leaves <Replay> with
+ * just the load guards, board derivation, and JSX.
+ */
+const useReplayPlayer = (id: string) => {
   // Number of moves shown so far: 0 is the empty board, moves.length is final.
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -55,8 +186,8 @@ const Replay = (props: Props) => {
 
   // Completed games are immutable, so fetch once and never poll or refetch.
   const { data: game, error } = useQuery<CompletedGameView>({
-    queryKey: ["completedGame", props.id, playerId],
-    queryFn: ({ signal }) => fetchCompletedGame(props.id, playerId as string, signal),
+    queryKey: ["completedGame", id, playerId],
+    queryFn: ({ signal }) => fetchCompletedGame(id, playerId as string, signal),
     staleTime: Infinity,
     enabled: !!playerId,
   });
@@ -121,6 +252,86 @@ const Replay = (props: Props) => {
     return () => clearTimeout(timer);
   }, [transition]);
 
+  const goTo = (next: number) => {
+    setPlaying(false);
+    setStep(Math.max(0, Math.min(next, total)));
+  };
+
+  const togglePlay = () => {
+    if (playing) {
+      setPlaying(false);
+      return;
+    }
+    // Restart from the beginning if we're already at the end.
+    if (step >= total) setStep(0);
+    setPlaying(true);
+  };
+
+  return {
+    game,
+    notFound,
+    loadError,
+    total,
+    step,
+    playing,
+    arrowDir,
+    transition,
+    goTo,
+    togglePlay,
+  };
+};
+
+/**
+ * Derives the render-ready view-model for the move currently scrubbed to from
+ * the immutable game and the transport `step`. Pure - it groups the board
+ * snapshot, winning line, transport-edge flags, the just-shown action (narrated
+ * below the board), and the spectator status line so the main component's body
+ * stays load-guards + JSX with no inline derivation.
+ */
+const deriveReplayView = (args: {
+  game: CompletedGameView;
+  step: number;
+  total: number;
+}) => {
+  const { game, step, total } = args;
+
+  const board = boardAfterActions(game.actions, step, game.size);
+  const result = calculateWinner(board, game.winLength);
+  const atEnd = step === total;
+  // The action just shown, narrated below the board (e.g. "O tricked the grid
+  // down") so a trick turn reads as a deliberate move rather than a skipped one.
+  const lastAction = step > 0 ? game.actions[step - 1] : null;
+
+  const status = spectatorStatus(
+    result ? result.winner : null,
+    step % 2 === 0 ? "X" : "O",
+    atEnd,
+  );
+
+  return {
+    board,
+    winningLine: result ? result.line : null,
+    atStart: step === 0,
+    atEnd,
+    lastAction,
+    status,
+  };
+};
+
+const Replay = (props: Props) => {
+  const {
+    game,
+    notFound,
+    loadError,
+    total,
+    step,
+    playing,
+    arrowDir,
+    transition,
+    goTo,
+    togglePlay,
+  } = useReplayPlayer(props.id);
+
   if (notFound) {
     return (
       <RoomNotFound
@@ -138,34 +349,8 @@ const Replay = (props: Props) => {
     );
   }
 
-  const board = boardAfterActions(game.actions, step, game.size);
-  const result = calculateWinner(board, game.winLength);
-  const atStart = step === 0;
-  const atEnd = step === total;
-  // The action just shown, narrated below the board (e.g. "O tricked the grid
-  // down") so a trick turn reads as a deliberate move rather than a skipped one.
-  const lastAction = step > 0 ? game.actions[step - 1] : null;
-
-  const { message: statusMessage, tone: statusTone } = spectatorStatus(
-    result ? result.winner : null,
-    step % 2 === 0 ? "X" : "O",
-    atEnd,
-  );
-
-  const goTo = (next: number) => {
-    setPlaying(false);
-    setStep(Math.max(0, Math.min(next, total)));
-  };
-
-  const togglePlay = () => {
-    if (playing) {
-      setPlaying(false);
-      return;
-    }
-    // Restart from the beginning if we're already at the end.
-    if (step >= total) setStep(0);
-    setPlaying(true);
-  };
+  const { board, winningLine, atStart, atEnd, lastAction, status } =
+    deriveReplayView({ game, step, total });
 
   return (
     <div className={styles.root}>
@@ -178,96 +363,31 @@ const Replay = (props: Props) => {
 
       <p className={styles.replayTag}>Replay · read-only</p>
 
-      <Status message={statusMessage} tone={statusTone} />
+      <Status message={status.message} tone={status.tone} />
 
-      <div className={styles.boardWrap}>
-        <Board
-          board={board}
-          winningLine={result ? result.line : null}
-          onSquareClick={() => {}}
-          disabled
-          transition={transition}
-        />
+      <ReplayBoard
+        board={board}
+        winningLine={winningLine}
+        transition={transition}
+        arrowDir={arrowDir}
+      />
 
-        {arrowDir && (
-          <div
-            className={classNames(
-              styles.shiftArrow,
-              ARROW_DIR_CLASS[arrowDir],
-            )}
-            aria-hidden="true"
-          >
-            <IoArrowForward className={styles.shiftArrowIcon} />
-          </div>
-        )}
-      </div>
+      <MoveNarration
+        step={step}
+        total={total}
+        lastAction={lastAction}
+        size={game.size}
+      />
 
-      <div className={styles.progress}>
-        Turn {step} / {total}
-      </div>
-
-      <p
-        className={classNames(styles.moveCaption, {
-          [styles.moveCaptionShift]: lastAction?.kind === "shift",
-        })}
-        aria-live="polite"
-      >
-        {lastAction
-          ? actionSentence(lastAction, step - 1, game.size)
-          : "Start of game"}
-      </p>
-
-      <div
-        className={styles.controls}
-        role="group"
-        aria-label="Replay controls"
-      >
-        <button
-          type="button"
-          className={styles.controlButton}
-          onClick={() => goTo(0)}
-          disabled={atStart}
-          aria-label="Jump to start"
-        >
-          ⏮
-        </button>
-        <button
-          type="button"
-          className={styles.controlButton}
-          onClick={() => goTo(step - 1)}
-          disabled={atStart}
-          aria-label="Previous move"
-        >
-          ◀
-        </button>
-        <button
-          type="button"
-          className={styles.playButton}
-          onClick={togglePlay}
-          disabled={total === 0}
-          aria-label={playing ? "Pause" : "Play"}
-        >
-          {playing ? "Pause" : atEnd ? "Replay" : "Play"}
-        </button>
-        <button
-          type="button"
-          className={styles.controlButton}
-          onClick={() => goTo(step + 1)}
-          disabled={atEnd}
-          aria-label="Next move"
-        >
-          ▶
-        </button>
-        <button
-          type="button"
-          className={styles.controlButton}
-          onClick={() => goTo(total)}
-          disabled={atEnd}
-          aria-label="Jump to end"
-        >
-          ⏭
-        </button>
-      </div>
+      <ReplayControls
+        step={step}
+        total={total}
+        playing={playing}
+        atStart={atStart}
+        atEnd={atEnd}
+        goTo={goTo}
+        togglePlay={togglePlay}
+      />
     </div>
   );
 };
