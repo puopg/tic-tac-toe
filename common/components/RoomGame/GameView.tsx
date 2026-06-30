@@ -407,6 +407,7 @@ const deriveGameView = (args: {
   const seatLabel = (seat: Player): string => {
     if (room.seats[seat] === AI_SEAT) return `AI (${seat})`;
     if (isLocal) return mySeat ? `You (${seat})` : `Player ${seat}`;
+    if (isAi) return mySeat === seat ? `You (${seat})` : `Player ${seat}`;
     // A player-chosen name (if any) names the seat for both players, so each can
     // see who they're playing against; an unnamed seat keeps the generic label.
     // The local player's own seat still reads "You" when they gave no name.
