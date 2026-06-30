@@ -179,6 +179,52 @@
   color: var(--o-color);
 }
 
+// The persistent "Your name" identity card. Mirrors the create-room card shell
+// so it reads as part of the same start-a-game cluster.
+.identityField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.identityLabel {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.identityInput {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+
+  &::placeholder {
+    color: var(--text-muted);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+}
+
+.identityHint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
 .createForm {
   display: flex;
   flex-wrap: wrap;

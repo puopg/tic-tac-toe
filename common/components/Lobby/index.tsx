@@ -22,6 +22,7 @@ import {
 } from "@/lib/roomTypes";
 import type { Board, ShiftMode } from "@/utils/gameLogic";
 import { usePlayerId } from "@/lib/usePlayerId";
+import { MAX_PLAYER_NAME_LEN, usePlayerName } from "@/lib/usePlayerName";
 import MiniBoard from "@/common/components/MiniBoard";
 import ShiftAnimation from "@/common/components/ShiftAnimation";
 import Spinner from "@/common/components/Spinner";
@@ -328,11 +329,38 @@ const StartPanel = (props: {
   onStartClient: (mode: "ai" | "local") => void;
   name: string;
   setName: (name: string) => void;
+  playerName: string;
+  setPlayerName: (name: string) => void;
   onCreate: (event: React.FormEvent) => void;
   creating: boolean;
   formError: string | null;
 }) => (
   <>
+    {/* The player's own display name, saved per-browser and reused across every
+        room (see usePlayerName). Editable here or from inside a room while
+        unseated - both surfaces read and write the same stored value, so a name
+        set on either one follows the player wherever they sit down. Only online
+        multiplayer uses it; the single-device games below have no opponent to
+        name. */}
+    <div className={styles.identityField}>
+      <label className={styles.identityLabel} htmlFor="lobby-player-name">
+        Your name
+      </label>
+      <input
+        id="lobby-player-name"
+        className={styles.identityInput}
+        type="text"
+        value={props.playerName}
+        maxLength={MAX_PLAYER_NAME_LEN}
+        placeholder="Add a name so opponents know who you are"
+        onChange={(e) => props.setPlayerName(e.target.value)}
+      />
+      <p className={styles.identityHint}>
+        Shown to opponents in multiplayer rooms. Saved on this device and
+        carried across rooms.
+      </p>
+    </div>
+
     {/* Single-device games: start instantly, no room or name needed. */}
     <div className={styles.quickPlay}>
       <button
@@ -428,6 +456,9 @@ const Lobby = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
   const playerId = usePlayerId();
+  // The player's persistent display name (localStorage-backed, shared with the
+  // in-room name field), so it can be set here and carries into any room joined.
+  const [playerName, setPlayerName] = usePlayerName();
   const {
     rooms,
     error,
@@ -510,6 +541,8 @@ const Lobby = () => {
             onStartClient={startClientGame}
             name={name}
             setName={setName}
+            playerName={playerName}
+            setPlayerName={setPlayerName}
             onCreate={handleCreateRoom}
             creating={createMutation.isPending}
             formError={formError}
