@@ -298,8 +298,8 @@ const deriveReplayView = (args: {
   const board = boardAfterActions(game.actions, step, game.size);
   const result = calculateWinner(board, game.winLength);
   const atEnd = step === total;
-  // The action just shown, narrated below the board (e.g. "O shifted the grid
-  // down") so a shift turn reads as a deliberate move rather than a skipped one.
+  // The action just shown, narrated below the board (e.g. "O tricked the grid
+  // down") so a trick turn reads as a deliberate move rather than a skipped one.
   const lastAction = step > 0 ? game.actions[step - 1] : null;
 
   const status = spectatorStatus(

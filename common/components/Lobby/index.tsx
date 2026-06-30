@@ -119,19 +119,19 @@ const HowToPlayDialog = (props: {
     isOpen={props.isOpen}
     close={props.close}
     title="How to play"
-    description="Tic tac toe - but with a twist!"
+    description="Trick-tac-toe - tic-tac-toe, but with a twist!"
   >
     <p className={styles.howToParagraph}>
       X moves first, O second - take turns placing marks, and the first to line
       up {props.winLength} in a row (across, down, or diagonally) wins.
     </p>
     <p className={styles.howToParagraph}>
-      The twist: once per game, instead of placing a mark, O can reshape the
-      whole board with <strong>Grid Collapse</strong>:
+      The twist: once per game, instead of placing a mark, O can play a{" "}
+      <strong>trick</strong> that reshapes the whole board:
     </p>
     <ShiftAnimation mode={props.shiftMode} />
     <p className={styles.howToParagraph} style={{ marginTop: 24 }}>
-      On larger boards, Player X also gets the ability to shift the board in any
+      On larger boards, Player X also earns a trick to slide the board in any
       direction by 1.
     </p>
   </UIDialog>
@@ -301,7 +301,7 @@ const RoomResults = (props: {
 const LobbyHeader = (props: { onHowTo: () => void }) => (
   <header className={styles.header}>
     <div className={styles.titleRow}>
-      <h1 className={styles.title}>Tic-Tac-Toe</h1>
+      <h1 className={styles.title}>Trick-Tac-Toe</h1>
       <button
         type="button"
         className={styles.howToButton}
@@ -312,8 +312,8 @@ const LobbyHeader = (props: { onHowTo: () => void }) => (
       </button>
     </div>
     <p className={styles.subtitle}>
-      A twist on tic-tac-toe: player O goes second but gets a one-time grid
-      shift. Join a room to play or spectate a live game.
+      A twist on tic-tac-toe: player O goes second but gets a one-time
+      trick. Join a room to play or spectate a live game.
     </p>
   </header>
 );

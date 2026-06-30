@@ -4,7 +4,12 @@ import { useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import classNames from "classnames";
 import { canXShift } from "@/utils/gameLogic";
-import type { Board as BoardState, Direction, Player } from "@/utils/gameLogic";
+import type {
+  Board as BoardState,
+  Direction,
+  Player,
+  ShiftMode,
+} from "@/utils/gameLogic";
 import { AI_SEAT, AUTO_RESET_MS } from "@/constants/game";
 import type { UseRoomResult } from "@/lib/useRoom";
 import Board, { type BoardTransition } from "@/common/components/Board";
@@ -20,13 +25,14 @@ import Status, {
 import Scoreboard from "@/common/components/Scoreboard";
 import ShiftDebug from "@/common/components/ShiftDebug";
 import styles from "./styles.module.scss";
+import UISpacer from "@/common/components/UISpacer";
 
 /** Dev-only: surfaces the shift-animation tuning panel. Compiled out of
  *  production by the bundler's dead-code elimination on this constant. */
 const SHIFT_DEBUG_ENABLED = process.env.NODE_ENV === "development";
 
 /**
- * The four grid-shift choices. Each renders as a single arrow on the matching
+ * The four trick directions. Each renders as a single arrow on the matching
  * edge of the board (`slotClass`), with a spelled-out label for assistive tech.
  */
 const SHIFT_OPTIONS: {
@@ -35,10 +41,10 @@ const SHIFT_OPTIONS: {
   label: string;
   slotClass: "shiftSlotTop" | "shiftSlotBottom" | "shiftSlotLeft" | "shiftSlotRight";
 }[] = [
-  { dir: "top", glyph: "↑", label: "Shift up", slotClass: "shiftSlotTop" },
-  { dir: "bottom", glyph: "↓", label: "Shift down", slotClass: "shiftSlotBottom" },
-  { dir: "left", glyph: "←", label: "Shift left", slotClass: "shiftSlotLeft" },
-  { dir: "right", glyph: "→", label: "Shift right", slotClass: "shiftSlotRight" },
+  { dir: "top", glyph: "↑", label: "Trick up", slotClass: "shiftSlotTop" },
+  { dir: "bottom", glyph: "↓", label: "Trick down", slotClass: "shiftSlotBottom" },
+  { dir: "left", glyph: "←", label: "Trick left", slotClass: "shiftSlotLeft" },
+  { dir: "right", glyph: "→", label: "Trick right", slotClass: "shiftSlotRight" },
 ];
 
 /**
@@ -146,6 +152,7 @@ const InfoPanel = (props: {
   showInvite?: boolean;
   roomId?: string;
   winLength: number;
+  viewerCount?: number;
   xLabel: string;
   oLabel: string;
   xActive: boolean;
@@ -156,14 +163,23 @@ const InfoPanel = (props: {
   xShiftLabel: string;
   canShiftNow: boolean;
   mySeat: Player | null;
+  trickMode?: ShiftMode;
   shiftActive: boolean;
   setShiftActive: Dispatch<SetStateAction<boolean>>;
   paused: boolean;
 }) => {
-  // The "use grid shift" trigger + hint. Rendered in the seat row the local
-  // player holds (gated by canShiftNow, which is already seat- and turn-specific),
-  // so exactly one row shows it. Shared by both seats since X's and O's shift arm
-  // the same way.
+  // The "use trick" trigger + hint. Rendered in the seat row the local player
+  // holds (gated by canShiftNow, which is already seat- and turn-specific), so
+  // exactly one row shows it. Shared by both seats since X's and O's trick arm
+  // the same way. O's trick follows the active variant; X's is always the classic
+  // one-cell slide, so the at-rest hint describes whichever applies to the seat
+  // about to trick.
+  const effectiveTrickMode: ShiftMode =
+    props.mySeat === "O" ? (props.trickMode ?? "classic") : "classic";
+  const trickRestHint =
+    effectiveTrickMode === "collapse"
+      ? "Slide consecutive marks off one edge (uses your turn)."
+      : "Slide the whole grid one cell (uses your turn).";
   const shiftControls = (
     <div className={styles.shiftControls}>
       <button
@@ -175,67 +191,86 @@ const InfoPanel = (props: {
         disabled={props.paused}
         aria-pressed={props.shiftActive}
       >
-        {props.shiftActive ? "Cancel shift" : "Use grid shift"}
+        {props.shiftActive ? "Cancel trick" : "Use trick"}
       </button>
       <p className={styles.shiftControlsHint}>
         {props.shiftActive
           ? "Pick a direction around the board (uses your turn)."
-          : "Slide the whole grid one cell (uses your turn)."}
+          : trickRestHint}
       </p>
     </div>
   );
 
   return (
     <aside className={styles.infoPanel}>
-      {props.showInvite && props.roomId && (
-        // Always available in an online room: copies a shareable link to this
-        // room. Local/AI games are single-device and not shareable, so they
-        // omit it.
-        <InviteButton roomId={props.roomId} />
-      )}
-
-      <span className={styles.winCondition}>{props.winLength} in a row</span>
-
-      <div
-        className={classNames(styles.infoRow, {
-          [styles.infoRowActive]: props.xActive,
-        })}
-      >
-        <span className={classNames(styles.infoName, styles.infoNameX)}>
-          {props.xLabel}
+      <div>
+        <span className={styles.winCondition}>
+          Win: {props.winLength} in a row
         </span>
-        {props.size > 3 ? (
-          <span
-            className={classNames(styles.shiftStatus, {
-              [styles.shiftStatusUsed]: props.xShiftUsed,
-            })}
-          >
-            Grid shift: {props.xShiftLabel}
+      </div>
+      <div>
+        {/* Live watcher count for online rooms only - the client-only local/AI
+          games are single-device, so a viewer count is meaningless there and
+          `viewerCount` is left undefined. */}
+        {props.viewerCount !== undefined && (
+          <span className={styles.viewerCount} title="People in this room">
+            {props.viewerCount} players here
           </span>
-        ) : (
-          <span className={styles.infoAbility}>Moves first</span>
+        )}
+      </div>
+      <UISpacer h={6} />
+
+      <div className={styles.infoBox}>
+        {props.showInvite && props.roomId && (
+          // Always available in an online room: copies a shareable link to this
+          // room. Local/AI games are single-device and not shareable, so they
+          // omit it.
+          <InviteButton roomId={props.roomId} />
         )}
 
-        {props.canShiftNow && props.mySeat === "X" && shiftControls}
-      </div>
+        <UISpacer h={10} />
 
-      <div
-        className={classNames(styles.infoRow, {
-          [styles.infoRowActive]: props.oActive,
-        })}
-      >
-        <span className={classNames(styles.infoName, styles.infoNameO)}>
-          {props.oLabel}
-        </span>
-        <span
-          className={classNames(styles.shiftStatus, {
-            [styles.shiftStatusUsed]: props.oShiftUsed,
+        <div
+          className={classNames(styles.infoRow, {
+            [styles.infoRowActive]: props.xActive,
           })}
         >
-          Grid shift: {props.oShiftUsed ? "used" : "available"}
-        </span>
+          <span className={classNames(styles.infoName, styles.infoNameX)}>
+            {props.xLabel}
+          </span>
+          {props.size > 3 ? (
+            <span
+              className={classNames(styles.shiftStatus, {
+                [styles.shiftStatusUsed]: props.xShiftUsed,
+              })}
+            >
+              Trick: {props.xShiftLabel}
+            </span>
+          ) : (
+            <span className={styles.infoAbility}>Moves first</span>
+          )}
 
-        {props.canShiftNow && props.mySeat === "O" && shiftControls}
+          {props.canShiftNow && props.mySeat === "X" && shiftControls}
+        </div>
+
+        <div
+          className={classNames(styles.infoRow, {
+            [styles.infoRowActive]: props.oActive,
+          })}
+        >
+          <span className={classNames(styles.infoName, styles.infoNameO)}>
+            {props.oLabel}
+          </span>
+          <span
+            className={classNames(styles.shiftStatus, {
+              [styles.shiftStatusUsed]: props.oShiftUsed,
+            })}
+          >
+            Trick: {props.oShiftUsed ? "used" : "available"}
+          </span>
+
+          {props.canShiftNow && props.mySeat === "O" && shiftControls}
+        </div>
       </div>
     </aside>
   );
@@ -403,6 +438,12 @@ type Props = {
   showInvite?: boolean;
   /** The room id the invite link points at; required when `showInvite`. */
   roomId?: string;
+  /**
+   * The active trick variant for O's trick, so the trick hint describes what it
+   * will actually do. Only O's trick uses this; X's is always the classic slide.
+   * Defaults to classic when unknown.
+   */
+  trickMode?: ShiftMode;
 };
 
 /**
@@ -503,6 +544,7 @@ const GameView = (props: Props) => {
           showInvite={props.showInvite}
           roomId={props.roomId}
           winLength={room.winLength}
+          viewerCount={room.viewerCount}
           xLabel={xLabel}
           oLabel={oLabel}
           xActive={xActive}
@@ -513,6 +555,7 @@ const GameView = (props: Props) => {
           xShiftLabel={xShiftLabel}
           canShiftNow={canShiftNow}
           mySeat={mySeat}
+          trickMode={props.trickMode}
           shiftActive={shiftActive}
           setShiftActive={setShiftActive}
           paused={paused}
