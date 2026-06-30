@@ -19,6 +19,15 @@ game.
 - **Seat claiming:** visitors claim an open X or O seat, and everyone else
   spectates. Your identity is stored per browser, and only the seat-holder whose
   turn it is can move.
+- **Player display names:** before sitting down in an online two-player room, a
+  player can type a short name (up to 20 characters) so their opponent sees who
+  they're playing against. The name is stored per browser and prefilled across
+  rooms; it rides along with the seat claim and is shown in each player's seat
+  label for both sides. Names follow their holder across the per-round mark swap
+  and are cleared when a seat is vacated. The "Waiting for opponent" header
+  animates a one-to-three-dot ellipsis so it reads as live rather than stalled
+  (hidden from screen readers; replaced by a static "..." under
+  `prefers-reduced-motion`). vs-AI and Local rooms are unaffected.
 - **Invite player:** a button in the room sidebar copies a shareable link to the
   room to the clipboard so a seated player or spectator can pass it to someone
   else to join or spectate. The link is built from the current page's origin
@@ -168,6 +177,7 @@ lib/roomStore.ts          # In-memory server store (Map on globalThis); all vali
 lib/gameConfig.ts         # Server-side POC config singleton (active ShiftMode); globalThis-backed, not persisted
 lib/roomTypes.ts          # Shared room, seat, score, completed-game, and player-stats types
 lib/usePlayerId.ts        # Client hook: stable per-browser player id
+lib/usePlayerName.ts      # Client hook: stable per-browser display name (persisted in localStorage, prefills across rooms)
 lib/useRoomStream.ts      # Client hook: SSE subscription for live room updates
 lib/useStepCue.ts         # Client hook: derive a one-shot board-animation cue the render a step counter changes
 lib/useReducedMotion.ts   # Client hook: track `prefers-reduced-motion`, shared by the board/shift animations
